@@ -40,25 +40,37 @@ header {
 
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
+
 .logo {
     margin: 0;
+
     font-size: 24px;
     font-weight: 800;
     letter-spacing: 2px;
+
+    white-space: nowrap;
 }
 
 .logo::first-letter {
     color: #e63946;
 }
 
+nav {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+}
+
 nav a {
     color: #ddd;
     text-decoration: none;
 
-    margin-left: 30px;
+    margin: 0;
 
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
+
+    white-space: nowrap;
 
     transition: color 0.2s;
 }
@@ -67,8 +79,19 @@ nav a:hover {
     color: #e63946;
 }
 
-nav a:hover {
-    color: #e63946;
+
+/* BOTÓN HAMBURGUESA */
+
+.menu-hamburguesa {
+    display: none;
+
+    background: none;
+    border: none;
+
+    color: white;
+    font-size: 30px;
+
+    cursor: pointer;
 }
 
 
@@ -85,7 +108,10 @@ nav a:hover {
     padding: 0 8%;
 
     background:
-        linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)),
+        linear-gradient(
+            rgba(0, 0, 0, 0.65),
+            rgba(0, 0, 0, 0.65)
+        ),
         url("taller.jpg");
 
     background-size: cover;
@@ -146,6 +172,9 @@ nav a:hover {
     font-size: 18px;
 
     border-radius: 8px;
+    border: none;
+
+    cursor: pointer;
 
     transition:
         background-color 0.2s,
@@ -236,37 +265,47 @@ nav a:hover {
     font-size: 16px;
     line-height: 1.6;
 }
+
+
 /* =========================
    TRABAJOS REALIZADOS
 ========================= */
 
 .trabajos {
     padding: 90px 8%;
+
     background-color: #111;
+
     text-align: center;
 }
 
 .subtitulo {
     color: #e63946;
+
     font-size: 14px;
     font-weight: bold;
+
     letter-spacing: 2px;
 }
 
 .trabajos h2 {
     font-size: 40px;
+
     margin: 10px 0;
 }
 
 .descripcion-trabajos {
     color: #aaa;
+
     font-size: 18px;
+
     margin-bottom: 40px;
 }
 
 .galeria {
     display: flex;
     justify-content: center;
+
     gap: 25px;
 }
 
@@ -277,6 +316,7 @@ nav a:hover {
     height: 400px;
 
     overflow: hidden;
+
     border-radius: 12px;
 
     background-color: #222;
@@ -306,22 +346,28 @@ nav a:hover {
 
     text-align: left;
 
-    background: linear-gradient(
-        transparent,
-        rgba(0, 0, 0, 0.9)
-    );
+    background:
+        linear-gradient(
+            transparent,
+            rgba(0, 0, 0, 0.9)
+        );
 }
 
 .info-trabajo h3 {
     margin: 0 0 5px;
+
     font-size: 22px;
 }
 
 .info-trabajo p {
     margin: 0;
+
     font-size: 15px;
+
     color: #ddd;
 }
+
+
 /* =========================
    RESEÑAS
 ========================= */
@@ -329,46 +375,62 @@ nav a:hover {
 .resenas {
     background-color: #f5f5f5;
     color: #111;
+
     padding: 80px 8%;
+
     text-align: center;
 }
 
 .resenas h2 {
     font-size: 38px;
+
     margin: 10px 0 40px;
 }
 
 .lista-resenas {
     display: flex;
     justify-content: center;
+
     gap: 25px;
 }
 
 .resena {
     background-color: white;
+
     width: 280px;
+
     padding: 30px;
+
     border-radius: 12px;
+
     text-align: left;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+
+    box-shadow:
+        0 5px 20px rgba(0, 0, 0, 0.08);
 }
 
 .estrellas {
     color: #f5b301;
+
     font-size: 22px;
+
     margin-bottom: 15px;
 }
 
 .resena p {
     font-size: 16px;
     line-height: 1.6;
+
     color: #555;
 }
 
 .resena h3 {
     font-size: 15px;
+
     margin-top: 20px;
 }
+
+
 /* =========================
    UBICACIÓN
 ========================= */
@@ -376,32 +438,42 @@ nav a:hover {
 .ubicacion {
     background-color: white;
     color: #111;
+
     padding: 80px 8%;
+
     text-align: center;
 }
 
 .ubicacion h2 {
     font-size: 38px;
+
     margin: 10px 0;
 }
 
 .ubicacion > p {
     color: #666;
+
     font-size: 18px;
+
     margin-bottom: 35px;
 }
 
 .mapa {
     max-width: 1100px;
+
     margin: auto;
+
     border-radius: 15px;
+
     overflow: hidden;
 }
 
 .mapa iframe {
     width: 100%;
     height: 400px;
+
     border: 0;
+
     display: block;
 }
 
@@ -427,6 +499,7 @@ nav a:hover {
 
 .contacto > p {
     font-size: 19px;
+
     color: #ccc;
 }
 
@@ -436,6 +509,89 @@ nav a:hover {
 
 .datos-contacto p {
     font-size: 18px;
+}
+
+
+/* =========================
+   FORMULARIO DE CITA
+========================= */
+
+.modal {
+    display: none;
+
+    position: fixed;
+
+    inset: 0;
+
+    background-color: rgba(0, 0, 0, 0.75);
+
+    justify-content: center;
+    align-items: center;
+
+    z-index: 2000;
+}
+
+.modal-contenido {
+    position: relative;
+
+    width: 90%;
+    max-width: 450px;
+
+    box-sizing: border-box;
+
+    background-color: white;
+    color: #111;
+
+    padding: 35px;
+
+    border-radius: 15px;
+}
+
+.modal-contenido h2 {
+    font-size: 32px;
+
+    margin-bottom: 25px;
+}
+
+.cerrar-modal {
+    position: absolute;
+
+    top: 15px;
+    right: 20px;
+
+    background: none;
+    border: none;
+
+    font-size: 30px;
+
+    cursor: pointer;
+}
+
+#formulario-cita {
+    display: flex;
+    flex-direction: column;
+
+    gap: 10px;
+}
+
+#formulario-cita label {
+    font-weight: 600;
+}
+
+#formulario-cita input,
+#formulario-cita select {
+    padding: 13px;
+
+    border: 1px solid #ccc;
+
+    border-radius: 7px;
+
+    font-family: inherit;
+    font-size: 16px;
+}
+
+#formulario-cita .boton {
+    margin-top: 15px;
 }
 
 
@@ -469,6 +625,8 @@ nav a:hover {
         0 5px 20px rgba(0, 0, 0, 0.3);
 
     transition: transform 0.2s;
+
+    z-index: 1500;
 }
 
 .whatsapp:hover {
@@ -495,78 +653,6 @@ footer p {
     margin: 0;
 }
 
-/* =========================
-   FORMULARIO DE CITA
-========================= */
-
-.modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background-color: rgba(0, 0, 0, 0.75);
-
-    justify-content: center;
-    align-items: center;
-
-    z-index: 2000;
-}
-
-.modal-contenido {
-    position: relative;
-    width: 90%;
-    max-width: 450px;
-
-    background-color: white;
-    color: #111;
-
-    padding: 35px;
-    border-radius: 15px;
-}
-
-.modal-contenido h2 {
-    font-size: 32px;
-    margin-bottom: 25px;
-}
-
-.cerrar-modal {
-    position: absolute;
-    top: 15px;
-    right: 20px;
-
-    background: none;
-    border: none;
-
-    font-size: 30px;
-    cursor: pointer;
-}
-
-#formulario-cita {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-#formulario-cita label {
-    font-weight: 600;
-}
-
-#formulario-cita input,
-#formulario-cita select {
-    padding: 13px;
-    border: 1px solid #ccc;
-    border-radius: 7px;
-
-    font-family: inherit;
-    font-size: 16px;
-}
-
-#formulario-cita .boton {
-    border: none;
-    margin-top: 15px;
-}
-.menu-hamburguesa {
-    display: none;
-}
 
 /* =========================
    MÓVILES
@@ -574,31 +660,59 @@ footer p {
 
 @media (max-width: 768px) {
 
+    /* MENÚ */
+
     header {
-        flex-direction: column;
-        gap: 15px;
-        padding: 20px;
+        padding: 18px 6%;
+
+        flex-direction: row;
+        flex-wrap: wrap;
+
+        gap: 10px;
+    }
+
+    .logo {
+        font-size: 20px;
+    }
+
+    .menu-hamburguesa {
+        display: block;
     }
 
     nav {
-    display: none;
-    flex-direction: column;
-    width: 100%;
-    text-align: center;
-    gap: 15px;
-}
+        display: none;
 
-nav.menu-abierto {
-    display: flex;
-}
+        flex-direction: column;
+
+        width: 100%;
+
+        gap: 0;
+
+        text-align: center;
+    }
+
+    nav.menu-abierto {
+        display: flex;
+    }
 
     nav a {
-        margin: 0;
+        width: 100%;
+
+        box-sizing: border-box;
+
+        padding: 13px 0;
+
         font-size: 15px;
+
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
     }
+
+
+    /* PORTADA */
 
     .inicio {
         min-height: 75vh;
+
         padding: 0 6%;
     }
 
@@ -612,11 +726,16 @@ nav.menu-abierto {
 
     .botones-inicio {
         flex-direction: column;
+
         align-items: flex-start;
     }
 
+
+    /* SERVICIOS */
+
     .tarjetas {
         flex-direction: column;
+
         align-items: center;
     }
 
@@ -624,8 +743,12 @@ nav.menu-abierto {
         width: 80%;
     }
 
+
+    /* TRABAJOS */
+
     .galeria {
         flex-direction: column;
+
         align-items: center;
     }
 
@@ -634,8 +757,12 @@ nav.menu-abierto {
         height: 350px;
     }
 
+
+    /* RESEÑAS */
+
     .lista-resenas {
         flex-direction: column;
+
         align-items: center;
     }
 
@@ -643,19 +770,51 @@ nav.menu-abierto {
         width: 80%;
     }
 
+
+    /* MAPA */
+
+    .mapa iframe {
+        height: 300px;
+    }
+
+
+    /* WHATSAPP */
+
     .whatsapp {
         width: 55px;
         height: 55px;
+
         right: 15px;
         bottom: 15px;
     }
-    .menu-hamburguesa {
-    display: block;
-    background: none;
-    border: none;
-    color: white;
-    font-size: 30px;
-    cursor: pointer;
+
 }
+
+
+/* =========================
+   PANTALLAS MUY PEQUEÑAS
+========================= */
+
+@media (max-width: 480px) {
+
+    .contenido-inicio h1 {
+        font-size: 38px;
+    }
+
+    .contenido-inicio p {
+        font-size: 16px;
+    }
+
+    .servicios h2,
+    .trabajos h2,
+    .resenas h2,
+    .ubicacion h2,
+    .contacto h2 {
+        font-size: 30px;
+    }
+
+    .trabajo {
+        height: 320px;
+    }
 
 }

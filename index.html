@@ -7,36 +7,48 @@
 
     <title>Taller Rivera</title>
 
+    <!-- FUENTE -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
           rel="stylesheet">
 
+    <!-- CSS -->
     <link rel="stylesheet" href="style.css">
 </head>
 
+
 <body>
 
-    <!-- MENÚ -->
+    <!-- =========================
+         MENÚ
+    ========================== -->
+
     <header>
 
-    <h2 class="logo">TALLER RIVERA</h2>
+        <h2 class="logo">TALLER RIVERA</h2>
 
-    <button class="menu-hamburguesa" id="menu-hamburguesa">
-        ☰
-    </button>
+        <button class="menu-hamburguesa" id="menu-hamburguesa">
+            ☰
+        </button>
 
-    <nav id="menu-nav">
-        <a href="#inicio">Inicio</a>
-        <a href="#servicios">Servicios</a>
-        <a href="#contacto">Contacto</a>
-    </nav>
+        <nav id="menu-nav">
+            <a href="#inicio">Inicio</a>
+            <a href="#servicios">Servicios</a>
+            <a href="#trabajos">Trabajos</a>
+            <a href="#resenas">Reseñas</a>
+            <a href="#ubicacion">Ubicación</a>
+            <a href="#contacto">Contacto</a>
+        </nav>
 
-</header>
+    </header>
 
 
-    <!-- PORTADA -->
+    <!-- =========================
+         PORTADA
+    ========================== -->
+
     <section id="inicio" class="inicio">
 
         <div class="contenido-inicio">
@@ -55,25 +67,27 @@
                 para que conduzcas con total tranquilidad.
             </p>
 
-           <div class="botones-inicio">
+            <div class="botones-inicio">
 
-    <button class="boton" id="abrir-cita">
-        Pedir cita
-    </button>
+                <button class="boton" id="abrir-cita">
+                    Pedir cita
+                </button>
 
-    <a class="boton-secundario"
-       href="#servicios">
-        Ver servicios
-    </a>
+                <a class="boton-secundario" href="#servicios">
+                    Ver servicios
+                </a>
 
-</div>
+            </div>
 
         </div>
 
     </section>
 
 
-    <!-- SERVICIOS -->
+    <!-- =========================
+         SERVICIOS
+    ========================== -->
+
     <section id="servicios" class="servicios">
 
         <h2>Nuestros servicios</h2>
@@ -81,132 +95,198 @@
         <div class="tarjetas">
 
             <div class="tarjeta">
-
                 <h3>🔧 Mecánica</h3>
 
                 <p>
                     Reparación y mantenimiento de tu vehículo.
                 </p>
-
             </div>
 
 
             <div class="tarjeta">
-
                 <h3>💻 Diagnosis</h3>
 
                 <p>
                     Diagnosis electrónica y detección de averías.
                 </p>
-
             </div>
 
 
             <div class="tarjeta">
-
                 <h3>🛢️ Mantenimiento</h3>
 
                 <p>
                     Aceite, filtros, frenos y revisiones.
                 </p>
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- =========================
+         TRABAJOS REALIZADOS
+    ========================== -->
+
+    <section id="trabajos" class="trabajos">
+
+        <span class="subtitulo">
+            NUESTRO TRABAJO
+        </span>
+
+        <h2>Trabajos realizados</h2>
+
+        <p class="descripcion-trabajos">
+            Algunos de nuestros últimos trabajos.
+        </p>
+
+        <div class="galeria">
+
+            <div class="trabajo">
+
+                <img src="trabajo1.avif"
+                     alt="Cambio de frenos">
+
+                <div class="info-trabajo">
+                    <h3>Cambio de frenos</h3>
+                    <p>Discos y pastillas de freno.</p>
+                </div>
+
+            </div>
+
+
+            <div class="trabajo">
+
+                <img src="trabajo2.avif"
+                     alt="Revisión de motor">
+
+                <div class="info-trabajo">
+                    <h3>Revisión de motor</h3>
+                    <p>Diagnosis y puesta a punto.</p>
+                </div>
+
+            </div>
+
+
+            <div class="trabajo">
+
+                <img src="trabajo3.avif"
+                     alt="Mantenimiento completo">
+
+                <div class="info-trabajo">
+                    <h3>Mantenimiento completo</h3>
+                    <p>Aceite, filtros y revisión general.</p>
+                </div>
 
             </div>
 
         </div>
 
     </section>
-  <!-- TRABAJOS REALIZADOS -->
-<section class="trabajos">
 
-    <span class="subtitulo">NUESTRO TRABAJO</span>
 
-    <h2>Trabajos realizados</h2>
+    <!-- =========================
+         RESEÑAS
+    ========================== -->
 
-    <p class="descripcion-trabajos">
-        Algunos de nuestros últimos trabajos.
-    </p>
+    <section id="resenas" class="resenas">
 
-    <div class="galeria">
+        <span class="subtitulo">
+            OPINIONES
+        </span>
 
-        <div class="trabajo">
-            <img src="trabajo1.avif" alt="Cambio de frenos">
+        <h2>
+            Lo que dicen nuestros clientes
+        </h2>
 
-            <div class="info-trabajo">
-                <h3>Cambio de frenos</h3>
-                <p>Discos y pastillas de freno.</p>
+        <div class="lista-resenas">
+
+            <div class="resena">
+
+                <div class="estrellas">
+                    ★★★★★
+                </div>
+
+                <p>
+                    "Muy buen trato y reparación rápida.
+                    El coche quedó perfecto."
+                </p>
+
+                <h3>— Javier M.</h3>
+
             </div>
-        </div>
 
-        <div class="trabajo">
-            <img src="trabajo2.avif" alt="Revisión de motor">
 
-            <div class="info-trabajo">
-                <h3>Revisión de motor</h3>
-                <p>Diagnosis y puesta a punto.</p>
+            <div class="resena">
+
+                <div class="estrellas">
+                    ★★★★★
+                </div>
+
+                <p>
+                    "Me explicaron la avería claramente
+                    y el precio fue el acordado."
+                </p>
+
+                <h3>— Laura G.</h3>
+
             </div>
-        </div>
 
-        <div class="trabajo">
-            <img src="trabajo3.avif" alt="Mantenimiento completo">
 
-            <div class="info-trabajo">
-                <h3>Mantenimiento completo</h3>
-                <p>Aceite, filtros y revisión general.</p>
+            <div class="resena">
+
+                <div class="estrellas">
+                    ★★★★★
+                </div>
+
+                <p>
+                    "Taller de confianza. Llevo aquí
+                    el coche para todas las revisiones."
+                </p>
+
+                <h3>— Iker R.</h3>
+
             </div>
+
         </div>
 
-    </div>
+    </section>
 
-</section>
-<!-- RESEÑAS -->
-<section class="resenas">
 
-    <span class="subtitulo">OPINIONES</span>
-    <h2>Lo que dicen nuestros clientes</h2>
+    <!-- =========================
+         UBICACIÓN
+    ========================== -->
 
-    <div class="lista-resenas">
+    <section id="ubicacion" class="ubicacion">
 
-        <div class="resena">
-            <div class="estrellas">★★★★★</div>
-            <p>"Muy buen trato y reparación rápida. El coche quedó perfecto."</p>
-            <h3>— Javier M.</h3>
+        <span class="subtitulo">
+            DÓNDE ESTAMOS
+        </span>
+
+        <h2>Ven a visitarnos</h2>
+
+        <p>
+            Estamos en Bizkaia. Ven a conocernos
+            y deja tu coche en buenas manos.
+        </p>
+
+        <div class="mapa">
+
+            <iframe
+                src="https://www.google.com/maps?q=Bilbao,Bizkaia&output=embed"
+                loading="lazy">
+            </iframe>
+
         </div>
 
-        <div class="resena">
-            <div class="estrellas">★★★★★</div>
-            <p>"Me explicaron la avería claramente y el precio fue el acordado."</p>
-            <h3>— Laura G.</h3>
-        </div>
+    </section>
 
-        <div class="resena">
-            <div class="estrellas">★★★★★</div>
-            <p>"Taller de confianza. Llevo aquí el coche para todas las revisiones."</p>
-            <h3>— Iker R.</h3>
-        </div>
 
-    </div>
+    <!-- =========================
+         CONTACTO
+    ========================== -->
 
-</section>
-<!-- UBICACIÓN -->
-<section class="ubicacion">
-
-    <span class="subtitulo">DÓNDE ESTAMOS</span>
-    <h2>Ven a visitarnos</h2>
-
-    <p>
-        Estamos en Bizkaia. Ven a conocernos y deja tu coche en buenas manos.
-    </p>
-
-    <div class="mapa">
-        <iframe
-            src="https://www.google.com/maps?q=Bilbao,Bizkaia&output=embed"
-            loading="lazy">
-        </iframe>
-    </div>
-
-</section>
-
-    <!-- CONTACTO -->
     <section id="contacto" class="contacto">
 
         <h2>Contacto</h2>
@@ -221,9 +301,13 @@
 
             <p>📞 600 000 000</p>
 
-            <p>🕒 Lunes a viernes: 8:00 - 18:00</p>
+            <p>
+                🕒 Lunes a viernes: 8:00 - 18:00
+            </p>
 
-            <p>✉️ info@tallerrivera.es</p>
+            <p>
+                ✉️ info@tallerrivera.es
+            </p>
 
         </div>
 
@@ -237,49 +321,108 @@
 
     </section>
 
-    <!-- FORMULARIO DE CITA -->
-<div id="modal-cita" class="modal">
 
-    <div class="modal-contenido">
+    <!-- =========================
+         FORMULARIO PEDIR CITA
+    ========================== -->
 
-        <button class="cerrar-modal" id="cerrar-modal">×</button>
+    <div id="modal-cita" class="modal">
 
-        <h2>Pedir cita</h2>
+        <div class="modal-contenido">
 
-        <form id="formulario-cita">
-
-            <label for="nombre">Nombre</label>
-            <input type="text" id="nombre" required>
-
-            <label for="servicio">Servicio</label>
-            <select id="servicio" required>
-                <option value="">Selecciona un servicio</option>
-                <option value="Mecánica">Mecánica</option>
-                <option value="Diagnosis">Diagnosis</option>
-                <option value="Mantenimiento">Mantenimiento</option>
-            </select>
-
-            <label for="fecha">Fecha</label>
-            <input type="date" id="fecha" required>
-
-            <label for="hora">Hora</label>
-            <input type="time" id="hora" required>
-
-            <label for="telefono">Teléfono</label>
-            <input type="tel" id="telefono" required>
-
-            <button type="submit" class="boton">
-                Solicitar cita
+            <button class="cerrar-modal"
+                    id="cerrar-modal">
+                ×
             </button>
 
-        </form>
+            <h2>Pedir cita</h2>
+
+            <form id="formulario-cita">
+
+                <label for="nombre">
+                    Nombre
+                </label>
+
+                <input
+                    type="text"
+                    id="nombre"
+                    required>
+
+
+                <label for="servicio">
+                    Servicio
+                </label>
+
+                <select id="servicio" required>
+
+                    <option value="">
+                        Selecciona un servicio
+                    </option>
+
+                    <option value="Mecánica">
+                        Mecánica
+                    </option>
+
+                    <option value="Diagnosis">
+                        Diagnosis
+                    </option>
+
+                    <option value="Mantenimiento">
+                        Mantenimiento
+                    </option>
+
+                </select>
+
+
+                <label for="fecha">
+                    Fecha
+                </label>
+
+                <input
+                    type="date"
+                    id="fecha"
+                    required>
+
+
+                <label for="hora">
+                    Hora
+                </label>
+
+                <input
+                    type="time"
+                    id="hora"
+                    required>
+
+
+                <label for="telefono">
+                    Teléfono
+                </label>
+
+                <input
+                    type="tel"
+                    id="telefono"
+                    required>
+
+
+                <button
+                    type="submit"
+                    class="boton">
+
+                    Solicitar cita
+
+                </button>
+
+            </form>
+
+        </div>
 
     </div>
 
-</div>
 
+    <!-- =========================
+         WHATSAPP FLOTANTE
+    ========================== -->
 
-    <!-- BOTÓN WHATSAPP FLOTANTE -->
     <a class="whatsapp"
        href="https://wa.me/34600000000?text=Hola,%20quiero%20información"
        target="_blank">
@@ -289,7 +432,10 @@
     </a>
 
 
-    <!-- PIE DE PÁGINA -->
+    <!-- =========================
+         PIE DE PÁGINA
+    ========================== -->
+
     <footer>
 
         <p>
@@ -298,6 +444,8 @@
 
     </footer>
 
+
+    <!-- JAVASCRIPT -->
     <script src="script.js"></script>
 
 </body>

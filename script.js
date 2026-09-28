@@ -49,3 +49,16 @@ const menuNav = document.getElementById("menu-nav");
 botonMenu.addEventListener("click", function () {
     menuNav.classList.toggle("menu-abierto");
 });
+// CERRAR MENÚ MÓVIL AL PULSAR UN ENLACE
+
+const enlacesMenu = document.querySelectorAll("#menu-nav a");
+
+enlacesMenu.forEach(function (enlace) {
+
+    enlace.addEventListener("click", function () {
+
+        menuNav.classList.remove("menu-abierto");
+
+    });
+
+});
