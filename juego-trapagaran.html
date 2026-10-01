@@ -2,273 +2,464 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>Trapagaran 3D</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Trapagaran 3D Real</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.css">
 <style>
-html,body{margin:0;height:100%;overflow:hidden;background:#111;font-family:Arial,Helvetica,sans-serif}
-#game{position:fixed;inset:0}
-#hud{position:fixed;top:12px;left:12px;z-index:10;color:white;background:rgba(0,0,0,.55);backdrop-filter:blur(7px);padding:10px 12px;border-radius:12px;font-size:14px;line-height:1.45}
-#status{position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:10;color:white;background:rgba(0,0,0,.55);padding:8px 12px;border-radius:999px;font-size:13px;text-align:center;max-width:80vw}
-#help{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:10;color:white;background:rgba(0,0,0,.55);padding:9px 12px;border-radius:12px;font-size:13px;text-align:center}
-#credit{position:fixed;right:8px;bottom:8px;z-index:10;color:#fff;background:rgba(0,0,0,.45);padding:5px 7px;border-radius:6px;font-size:10px}
-button{font:inherit}
-@media(max-width:700px){#hud{font-size:12px}#help{font-size:11px;bottom:8px;width:85%}}
+html,body,#map{margin:0;width:100%;height:100%;overflow:hidden;background:#0d1419;font-family:Inter,Arial,sans-serif}
+#map{position:fixed;inset:0}
+.maplibregl-ctrl-bottom-left,.maplibregl-ctrl-bottom-right{display:none}
+#hud{position:fixed;z-index:20;left:14px;top:14px;color:#fff;background:rgba(5,10,14,.62);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.13);padding:11px 13px;border-radius:13px;line-height:1.45;box-shadow:0 6px 24px rgba(0,0,0,.2);font-size:13px;max-width:270px}
+#hud b{font-size:15px}
+#status{position:fixed;z-index:20;top:15px;left:50%;transform:translateX(-50%);color:#fff;background:rgba(5,10,14,.72);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(9px);padding:8px 13px;border-radius:999px;font-size:12px;text-align:center;max-width:min(78vw,650px);transition:opacity .5s}
+#help{position:fixed;z-index:20;bottom:14px;left:50%;transform:translateX(-50%);color:#fff;background:rgba(5,10,14,.62);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(9px);padding:9px 12px;border-radius:12px;font-size:12px;text-align:center;white-space:nowrap}
+#cross{position:fixed;z-index:19;left:50%;top:64%;width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.8);transform:translate(-50%,-50%);box-shadow:0 0 0 2px rgba(0,0,0,.35);pointer-events:none}
+#quality{position:fixed;z-index:20;right:14px;top:14px;display:flex;gap:7px}
+#quality button{border:1px solid rgba(255,255,255,.16);background:rgba(5,10,14,.62);color:#fff;border-radius:10px;padding:8px 10px;font:inherit;cursor:pointer;backdrop-filter:blur(8px)}
+#quality button.active{background:rgba(255,255,255,.9);color:#111}
+#credit{position:fixed;z-index:20;right:8px;bottom:7px;color:#fff;background:rgba(0,0,0,.48);padding:4px 6px;border-radius:6px;font-size:9px}
+#loadingbar{position:fixed;z-index:21;left:0;top:0;height:3px;width:100%;background:rgba(255,255,255,.15)}
+#loadingbar span{display:block;height:100%;width:8%;background:#fff;animation:load 1.5s ease-in-out infinite}
+@keyframes load{0%{transform:translateX(-120%)}100%{transform:translateX(1350%)}}
+@media(max-width:700px){
+ #hud{left:8px;top:8px;font-size:11px;padding:8px 9px;max-width:190px}
+ #hud b{font-size:13px}
+ #quality{right:8px;top:8px;flex-direction:column}
+ #quality button{font-size:11px;padding:7px 8px}
+ #status{top:auto;bottom:58px;font-size:10px}
+ #help{bottom:7px;width:86%;font-size:10px;white-space:normal}
+ #credit{display:none}
+}
 </style>
+<script type="importmap">
+{
+  "imports":{
+    "three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
 </head>
 <body>
-<div id="game"></div>
-<div id="hud"><b>Trapagaran 3D</b><br>Zona: Estrada del Molino / centro<br>Base: Ortofoto oficial 2025<br>Velocidad: <span id="speed">0</span> km/h</div>
-<div id="status">Cargando Trapagaran real: ortofoto 2025 + calles y edificios…</div>
-<div id="help">WASD / flechas · Shift correr · Espacio saltar · Arrastra con el ratón para girar cámara</div>
-<div id="credit">Ortofoto © Eusko Jaurlaritza / Gobierno Vasco · © OpenStreetMap contributors</div>
-<script type="module">
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
+<div id="map"></div>
+<div id="loadingbar"><span></span></div>
+<div id="hud">
+  <b>Trapagaran 3D</b><br>
+  <span id="zone">Centro de Trapagaran</span><br>
+  Velocidad: <span id="speed">0</span> km/h<br>
+  Altitud: <span id="alt">--</span> m
+</div>
+<div id="status">Cargando ortofoto 2025, relieve y edificios de Trapagaran…</div>
+<div id="quality">
+  <button id="photoBtn" class="active" type="button">Foto real</button>
+  <button id="labelsBtn" class="active" type="button">Calles</button>
+</div>
+<div id="cross"></div>
+<div id="help">WASD / flechas · Shift correr · Espacio saltar · arrastra para mirar · rueda para acercar</div>
+<div id="credit">Ortofoto y sombreado LiDAR © Eusko Jaurlaritza / Gobierno Vasco · Datos © OpenStreetMap / OpenFreeMap · Terreno © Mapterhorn contributors</div>
 
-const container=document.getElementById("game");
+<script type="module">
+import * as maplibregl from "https://unpkg.com/maplibre-gl@6.11.2/dist/maplibre-gl.mjs";
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+const START = {lng:-3.0372407, lat:43.3057623};
+const BOUNDS = {
+  west:-3.046223852841195,
+  east:-3.0282575471588045,
+  north:43.312299022789794,
+  south:43.29922487422688
+};
+
+const ORTHO_URL =
+  "https://www.geo.euskadi.eus/geoeuskadi/rest/services/U11/ORTOARGAZKIAK/MapServer/export" +
+  "?bbox=-339104.0881,5357628.3964,-337104.0881,5359628.3964" +
+  "&bboxSR=3857&imageSR=3857&layers=show%3A189&size=4096,4096&format=jpg&transparent=false&f=image";
+
+const LIDAR_SHADE_URL =
+  "https://www.geo.euskadi.eus/geoeuskadi/rest/services/U11/KARTOGRAFIA_CAS/MapServer/export" +
+  "?bbox=-339104.0881,5357628.3964,-337104.0881,5359628.3964" +
+  "&bboxSR=3857&imageSR=3857&layers=show%3A8&size=4096,4096&format=png32&transparent=true&f=image";
+
 const statusEl=document.getElementById("status");
 const speedEl=document.getElementById("speed");
-const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
-renderer.setSize(innerWidth,innerHeight);
-renderer.shadowMap.enabled=true;
-renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-renderer.outputColorSpace=THREE.SRGBColorSpace;
-renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.1;
-container.appendChild(renderer.domElement);
+const altEl=document.getElementById("alt");
+const loadingBar=document.getElementById("loadingbar");
+const photoBtn=document.getElementById("photoBtn");
+const labelsBtn=document.getElementById("labelsBtn");
 
-const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x9fc7df);
-scene.fog=new THREE.FogExp2(0xa8c3d2,.00165);
-
-const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,3500);
-
-const hemi=new THREE.HemisphereLight(0xe7f5ff,0x506145,1.75);
-scene.add(hemi);
-const sun=new THREE.DirectionalLight(0xffe5c2,3.2);
-sun.position.set(-180,260,-100);
-sun.castShadow=true;
-sun.shadow.mapSize.set(2048,2048);
-sun.shadow.camera.left=-300; sun.shadow.camera.right=300; sun.shadow.camera.top=300; sun.shadow.camera.bottom=-300;
-scene.add(sun);
-
-const ORTHO_URL="https://www.geo.euskadi.eus/geoeuskadi/rest/services/U11/ORTOARGAZKIAK/MapServer/export?bbox=-338954.0881406058,5357778.39636691,-337254.0881406058,5359478.39636691&bboxSR=3857&imageSR=3857&layers=show%3A189&size=2048,2048&format=jpg&transparent=false&f=image";
-const groundMat=new THREE.MeshStandardMaterial({color:0x617e4f,roughness:.95});
-const ground=new THREE.Mesh(new THREE.PlaneGeometry(1700,1700),groundMat);
-ground.rotation.x=-Math.PI/2;
-ground.receiveShadow=true;
-scene.add(ground);
-
-const orthoLoader=new THREE.TextureLoader();
-orthoLoader.setCrossOrigin("anonymous");
-orthoLoader.load(
-  ORTHO_URL,
-  tex=>{
-    tex.colorSpace=THREE.SRGBColorSpace;
-    tex.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
-    groundMat.map=tex;
-    groundMat.color.set(0xffffff);
-    groundMat.needsUpdate=true;
-  },
-  undefined,
-  ()=>{ console.warn("No se pudo cargar la ortofoto; se mantiene el terreno de respaldo."); }
-);
-
-const world=new THREE.Group();
-scene.add(world);
-
-const roadMat=new THREE.MeshStandardMaterial({color:0x303235,roughness:.93});
-const sidewalkMat=new THREE.MeshStandardMaterial({color:0x8b8d88,roughness:1});
-const buildingMats=[
- new THREE.MeshStandardMaterial({color:0xb08b75,roughness:.88}),
- new THREE.MeshStandardMaterial({color:0xc1a28d,roughness:.9}),
- new THREE.MeshStandardMaterial({color:0x9d7c6a,roughness:.9}),
- new THREE.MeshStandardMaterial({color:0xc1b6a8,roughness:.92}),
- new THREE.MeshStandardMaterial({color:0x806d63,roughness:.9})
-];
-
-const LAT0=43.3057623, LON0=-3.0372407;
-const DEG_LAT=111320;
-const DEG_LON=111320*Math.cos(LAT0*Math.PI/180);
-function xy(lat,lon){ return new THREE.Vector2((lon-LON0)*DEG_LON, -(lat-LAT0)*DEG_LAT); }
-
-function roadWidth(tags={}){
- const hw=tags.highway||"";
- if(hw==="motorway"||hw==="trunk")return 14;
- if(hw==="primary")return 11;
- if(hw==="secondary")return 9;
- if(hw==="tertiary")return 8;
- if(hw==="residential"||hw==="unclassified")return 6.5;
- if(hw==="service")return 4.5;
- if(hw==="footway"||hw==="path"||hw==="pedestrian")return 2.2;
- return 4;
-}
-function addRoad(geom,tags){
- if(!geom||geom.length<2)return;
- const w=roadWidth(tags);
- for(let i=0;i<geom.length-1;i++){
-   const a=xy(geom[i].lat,geom[i].lon), b=xy(geom[i+1].lat,geom[i+1].lon);
-   const dx=b.x-a.x, dz=b.y-a.y, len=Math.hypot(dx,dz);
-   if(len<.3)continue;
-   const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,.08,len+.5),roadMat);
-   mesh.position.set((a.x+b.x)/2,.045,(a.y+b.y)/2);
-   mesh.rotation.y=Math.atan2(dx,dz);
-   mesh.receiveShadow=true;
-   world.add(mesh);
-   if(w>=6){
-      const sw=new THREE.Mesh(new THREE.BoxGeometry(w+2.2,.055,len+.6),sidewalkMat);
-      sw.position.set((a.x+b.x)/2,.025,(a.y+b.y)/2);
-      sw.rotation.y=mesh.rotation.y;
-      sw.receiveShadow=true;
-      world.add(sw); world.remove(mesh); world.add(sw); world.add(mesh);
-   }
- }
-}
-function parseHeight(tags={}){
- if(tags.height){
-   const h=parseFloat(String(tags.height).replace(",","."));
-   if(Number.isFinite(h))return Math.min(Math.max(h,2.8),65);
- }
- if(tags["building:levels"]){
-   const n=parseFloat(tags["building:levels"]);
-   if(Number.isFinite(n))return Math.min(Math.max(n*3.05,3),60);
- }
- return 6+Math.random()*11;
-}
-function addBuilding(geom,tags){
- if(!geom||geom.length<4)return;
- const pts=geom.map(p=>xy(p.lat,p.lon));
- const shape=new THREE.Shape();
- shape.moveTo(pts[0].x,-pts[0].y);
- for(let i=1;i<pts.length;i++)shape.lineTo(pts[i].x,-pts[i].y);
- const h=parseHeight(tags);
- const ex=new THREE.ExtrudeGeometry(shape,{depth:h,bevelEnabled:false,steps:1});
- ex.rotateX(-Math.PI/2);
- const mat=buildingMats[Math.floor(Math.random()*buildingMats.length)];
- const m=new THREE.Mesh(ex,mat);
- m.position.y=.08;
- m.castShadow=true;m.receiveShadow=true;
- world.add(m);
-}
-
-function fallbackTown(){
- for(let z=-380;z<380;z+=90){
-   const r=new THREE.Mesh(new THREE.BoxGeometry(9,.08,760),roadMat);r.position.set(z,.04,0);world.add(r);
-   const r2=new THREE.Mesh(new THREE.BoxGeometry(760,.08,9),roadMat);r2.position.set(0,.04,z);world.add(r2);
- }
- for(let x=-330;x<=330;x+=55)for(let z=-330;z<=330;z+=55){
-   if(Math.random()<.25)continue;
-   const h=7+Math.random()*18;
-   const b=new THREE.Mesh(new THREE.BoxGeometry(28+Math.random()*12,h,30+Math.random()*10),buildingMats[Math.floor(Math.random()*buildingMats.length)]);
-   b.position.set(x+(Math.random()-.5)*15,h/2,z+(Math.random()-.5)*15);b.castShadow=true;b.receiveShadow=true;world.add(b);
- }
-}
-
-async function loadOSM(){
- try{
-  const q=`[out:json][timeout:28];(way["building"](around:900,${LAT0},${LON0});way["highway"](around:900,${LAT0},${LON0}););out tags geom;`;
-  const url="https://overpass-api.de/api/interpreter?data="+encodeURIComponent(q);
-  const res=await fetch(url);
-  if(!res.ok)throw new Error("HTTP "+res.status);
-  const data=await res.json();
-  let bc=0,rc=0;
-  const roads=[],buildings=[];
-  for(const e of data.elements||[]){
-    if(e.tags?.building){buildings.push(e);bc++}
-    else if(e.tags?.highway){roads.push(e);rc++}
-  }
-  roads.sort((a,b)=>roadWidth(a.tags)-roadWidth(b.tags));
-  roads.forEach(e=>addRoad(e.geometry,e.tags));
-  buildings.slice(0,1400).forEach(e=>addBuilding(e.geometry,e.tags));
-  statusEl.textContent=`Mapa real cargado: ${bc} edificios · ${rc} tramos de calle`;
-  setTimeout(()=>statusEl.style.opacity=".15",4000);
- }catch(err){
-  console.warn(err); fallbackTown();
-  statusEl.textContent="No se pudo descargar el mapa real; mostrando escenario 3D de respaldo.";
- }
-}
-loadOSM();
-
-function limb(r=.13,l=.85,color=0x222222){
- const g=new THREE.CylinderGeometry(r,r*.9,l,8);
- const m=new THREE.MeshStandardMaterial({color,roughness:.8});
- const mesh=new THREE.Mesh(g,m);mesh.castShadow=true;return mesh;
-}
-const player=new THREE.Group();
-scene.add(player);
-const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.31,.75,6,10),new THREE.MeshStandardMaterial({color:0x243a74,roughness:.72}));
-torso.position.y=1.42;torso.castShadow=true;player.add(torso);
-const head=new THREE.Mesh(new THREE.SphereGeometry(.24,18,14),new THREE.MeshStandardMaterial({color:0xd3a078,roughness:.82}));
-head.position.y=2.22;head.castShadow=true;player.add(head);
-const hair=new THREE.Mesh(new THREE.SphereGeometry(.245,16,8,0,Math.PI*2,0,Math.PI*.55),new THREE.MeshStandardMaterial({color:0x291c16,roughness:1}));
-hair.position.set(0,2.3,0);hair.castShadow=true;player.add(hair);
-const legL=limb(.12,.86,0x22262b),legR=limb(.12,.86,0x22262b);
-legL.position.set(-.16,.62,0);legR.position.set(.16,.62,0);player.add(legL,legR);
-const armL=limb(.095,.78,0xd3a078),armR=limb(.095,.78,0xd3a078);
-armL.position.set(-.43,1.48,0);armR.position.set(.43,1.48,0);player.add(armL,armR);
-player.position.set(0,0,0);
-
-let camYaw=Math.PI,camPitch=.28,camDist=5.2;
-let drag=false,px=0,py=0;
-renderer.domElement.addEventListener("pointerdown",e=>{drag=true;px=e.clientX;py=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)});
-renderer.domElement.addEventListener("pointermove",e=>{
- if(!drag)return;
- camYaw-=(e.clientX-px)*.004; camPitch=Math.max(-.05,Math.min(.75,camPitch+(e.clientY-py)*.003));
- px=e.clientX;py=e.clientY;
+const map = new maplibregl.Map({
+  container:"map",
+  style:"https://tiles.openfreemap.org/styles/bright",
+  center:[START.lng,START.lat],
+  zoom:17.25,
+  pitch:68,
+  bearing:8,
+  minZoom:14,
+  maxZoom:20,
+  maxPitch:82,
+  canvasContextAttributes:{antialias:true},
+  renderWorldCopies:false
 });
-renderer.domElement.addEventListener("pointerup",()=>drag=false);
-renderer.domElement.addEventListener("wheel",e=>{camDist=Math.max(3.2,Math.min(9,camDist+e.deltaY*.004));},{passive:true});
+
+map.dragRotate.disable();
+map.touchZoomRotate.disableRotation();
+
+let player={lng:START.lng,lat:START.lat};
+let heading=8;
+let currentSpeed=0;
+let movingState="Idle";
+let jumpOffset=0;
+let jumpVel=0;
+let grounded=true;
+let photoVisible=true;
+let streetVisible=true;
+let userLooking=false;
+let lookStartX=0;
+let cameraBearing=8;
+let cameraPitch=68;
+let zoom=17.25;
 
 const keys={};
-addEventListener("keydown",e=>{keys[e.code]=true;if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code))e.preventDefault()});
-addEventListener("keyup",e=>{keys[e.code]=false});
+window.addEventListener("keydown",e=>{
+  keys[e.code]=true;
+  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code)) e.preventDefault();
+});
+window.addEventListener("keyup",e=>{keys[e.code]=false;});
 
-let vy=0,onGround=true,walkT=0;
-const clock=new THREE.Clock();
+const canvas=map.getCanvas();
+canvas.addEventListener("pointerdown",e=>{
+  userLooking=true;
+  lookStartX=e.clientX;
+  canvas.setPointerCapture?.(e.pointerId);
+});
+canvas.addEventListener("pointermove",e=>{
+  if(!userLooking)return;
+  const dx=e.clientX-lookStartX;
+  lookStartX=e.clientX;
+  cameraBearing=(cameraBearing+dx*.22+360)%360;
+});
+canvas.addEventListener("pointerup",()=>{userLooking=false});
+canvas.addEventListener("pointercancel",()=>{userLooking=false});
+canvas.addEventListener("wheel",e=>{
+  zoom=Math.max(15.2,Math.min(19.2,zoom-e.deltaY*.00125));
+},{passive:true});
 
-function animate(){
- requestAnimationFrame(animate);
- const dt=Math.min(clock.getDelta(),.035);
- let f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0);
- let r=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
- const run=keys.ShiftLeft||keys.ShiftRight;
- const speed=run?8.5:4.6;
- let moving=false;
- if(f||r){
-   const len=Math.hypot(f,r);f/=len;r/=len;
-   const forward=new THREE.Vector3(-Math.sin(camYaw),0,-Math.cos(camYaw));
-   const right=new THREE.Vector3(-forward.z,0,forward.x);
-   const v=forward.multiplyScalar(f).add(right.multiplyScalar(r)).normalize();
-   player.position.addScaledVector(v,speed*dt);
-   player.rotation.y=Math.atan2(v.x,v.z);
-   moving=true;
-   walkT+=dt*(run?12:8);
-   legL.rotation.x=Math.sin(walkT)*.55;legR.rotation.x=-Math.sin(walkT)*.55;
-   armL.rotation.x=-Math.sin(walkT)*.4;armR.rotation.x=Math.sin(walkT)*.4;
- } else {
-   legL.rotation.x*=.82;legR.rotation.x*=.82;armL.rotation.x*=.82;armR.rotation.x*=.82;
- }
- if(keys.Space&&onGround){vy=6.6;onGround=false}
- vy-=17.5*dt;player.position.y+=vy*dt;
- if(player.position.y<0){player.position.y=0;vy=0;onGround=true}
-
- const target=player.position.clone().add(new THREE.Vector3(0,1.55,0));
- const horiz=camDist*Math.cos(camPitch);
- const desired=new THREE.Vector3(
-   target.x+Math.sin(camYaw)*horiz,
-   target.y+Math.sin(camPitch)*camDist+1.0,
-   target.z+Math.cos(camYaw)*horiz
- );
- camera.position.lerp(desired,1-Math.pow(.001,dt));
- camera.lookAt(target);
- speedEl.textContent=moving?Math.round(speed*3.6):"0";
- renderer.render(scene,camera);
+function insertBeforeRoadLayer(){
+  const layers=map.getStyle().layers||[];
+  return layers.find(l=>l.type==="line" || l.type==="symbol" || l["source-layer"]==="building")?.id;
 }
-animate();
+function firstLabelLayer(){
+  return (map.getStyle().layers||[]).find(l=>l.type==="symbol" && l.layout && l.layout["text-field"])?.id;
+}
 
-addEventListener("resize",()=>{
- camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
- renderer.setSize(innerWidth,innerHeight);
+map.on("load",()=>{
+  map.addSource("terrain-real",{
+    type:"raster-dem",
+    url:"https://tiles.mapterhorn.com/tilejson.json",
+    tileSize:512
+  });
+  map.setTerrain({source:"terrain-real",exaggeration:1.08});
+
+  map.addSource("ortho2025",{
+    type:"image",
+    url:ORTHO_URL,
+    coordinates:[
+      [BOUNDS.west,BOUNDS.north],
+      [BOUNDS.east,BOUNDS.north],
+      [BOUNDS.east,BOUNDS.south],
+      [BOUNDS.west,BOUNDS.south]
+    ]
+  });
+  map.addLayer({
+    id:"ortho-real",
+    type:"raster",
+    source:"ortho2025",
+    paint:{
+      "raster-opacity":1,
+      "raster-saturation":-.05,
+      "raster-contrast":.08,
+      "raster-brightness-min":.02,
+      "raster-brightness-max":.98
+    }
+  },insertBeforeRoadLayer());
+
+  map.addSource("lidar-shade",{
+    type:"image",
+    url:LIDAR_SHADE_URL,
+    coordinates:[
+      [BOUNDS.west,BOUNDS.north],
+      [BOUNDS.east,BOUNDS.north],
+      [BOUNDS.east,BOUNDS.south],
+      [BOUNDS.west,BOUNDS.south]
+    ]
+  });
+  map.addLayer({
+    id:"lidar-shade-layer",
+    type:"raster",
+    source:"lidar-shade",
+    paint:{
+      "raster-opacity":.16,
+      "raster-contrast":.2
+    }
+  },insertBeforeRoadLayer());
+
+  if(!map.getSource("openfreemap-3d")){
+    map.addSource("openfreemap-3d",{type:"vector",url:"https://tiles.openfreemap.org/planet"});
+  }
+
+  const labelId=firstLabelLayer();
+  map.addLayer({
+    id:"trapagaran-buildings-3d",
+    type:"fill-extrusion",
+    source:"openfreemap-3d",
+    "source-layer":"building",
+    minzoom:14.7,
+    filter:["!=",["get","hide_3d"],true],
+    paint:{
+      "fill-extrusion-color":[
+        "interpolate",["linear"],["coalesce",["get","render_height"],8],
+        0,"#bdb7ae",
+        12,"#a88672",
+        25,"#8f6d5d",
+        60,"#77716b"
+      ],
+      "fill-extrusion-height":[
+        "interpolate",["linear"],["zoom"],
+        14.7,0,
+        15.35,["coalesce",["get","render_height"],8]
+      ],
+      "fill-extrusion-base":["coalesce",["get","render_min_height"],0],
+      "fill-extrusion-opacity":.88,
+      "fill-extrusion-vertical-gradient":true
+    }
+  },labelId);
+
+  map.setLight({
+    anchor:"map",
+    color:"#fff4e3",
+    intensity:.63,
+    position:[1.25,205,38]
+  });
+
+  addPlayerLayer();
+  loadingBar.style.display="none";
+  statusEl.textContent="Trapagaran real cargado · ortofoto 2025 + relieve + edificios 3D";
+  setTimeout(()=>statusEl.style.opacity=".18",4200);
+});
+
+photoBtn.addEventListener("click",()=>{
+  photoVisible=!photoVisible;
+  photoBtn.classList.toggle("active",photoVisible);
+  if(map.getLayer("ortho-real"))map.setLayoutProperty("ortho-real","visibility",photoVisible?"visible":"none");
+  if(map.getLayer("lidar-shade-layer"))map.setLayoutProperty("lidar-shade-layer","visibility",photoVisible?"visible":"none");
+});
+
+labelsBtn.addEventListener("click",()=>{
+  streetVisible=!streetVisible;
+  labelsBtn.classList.toggle("active",streetVisible);
+  for(const l of map.getStyle().layers||[]){
+    if(l.type==="line" || l.type==="symbol"){
+      try{map.setLayoutProperty(l.id,"visibility",streetVisible?"visible":"none")}catch{}
+    }
+  }
+});
+
+let playerLayer=null;
+function addPlayerLayer(){
+  const playerScene=new THREE.Scene();
+  const threeCamera=new THREE.Camera();
+  const light1=new THREE.DirectionalLight(0xffffff,2.3);
+  light1.position.set(2,-3,6).normalize();
+  playerScene.add(light1);
+  const light2=new THREE.HemisphereLight(0xddeeff,0x665544,1.7);
+  playerScene.add(light2);
+
+  let model=null;
+  let mixer=null;
+  let actions={};
+  let activeAction=null;
+  let lastT=performance.now();
+
+  const fallback=new THREE.Group();
+  const bodyMat=new THREE.MeshStandardMaterial({color:0x243e70,roughness:.75});
+  const skinMat=new THREE.MeshStandardMaterial({color:0xc98d65,roughness:.9});
+  const darkMat=new THREE.MeshStandardMaterial({color:0x202328,roughness:.85});
+  const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.25,.75,6,12),bodyMat);
+  torso.position.y=1.22;
+  const head=new THREE.Mesh(new THREE.SphereGeometry(.21,16,12),skinMat);
+  head.position.y=1.94;
+  const legs=new THREE.Group();
+  for(const x of [-.13,.13]){
+    const leg=new THREE.Mesh(new THREE.CylinderGeometry(.085,.095,.72,8),darkMat);
+    leg.position.set(x,.5,0);
+    legs.add(leg);
+  }
+  fallback.add(torso,head,legs);
+  fallback.visible=true;
+  playerScene.add(fallback);
+
+  const loader=new GLTFLoader();
+  loader.load(
+    "https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/Soldier.glb",
+    gltf=>{
+      model=gltf.scene;
+      model.scale.setScalar(1);
+      model.traverse(o=>{
+        if(o.isMesh){
+          o.castShadow=true;
+          o.receiveShadow=true;
+        }
+      });
+      playerScene.add(model);
+      fallback.visible=false;
+      mixer=new THREE.AnimationMixer(model);
+      for(const clip of gltf.animations){
+        actions[clip.name]=mixer.clipAction(clip);
+      }
+      setAnimation("Idle",true);
+    },
+    undefined,
+    ()=>{statusEl.textContent="Mapa real cargado · personaje simplificado de respaldo";}
+  );
+
+  function setAnimation(name,force=false){
+    if(!mixer || !actions[name])return;
+    if(!force && activeAction===actions[name])return;
+    const next=actions[name];
+    next.reset().fadeIn(.18).play();
+    if(activeAction && activeAction!==next)activeAction.fadeOut(.18);
+    activeAction=next;
+  }
+
+  playerLayer={
+    id:"player-3d",
+    type:"custom",
+    renderingMode:"3d",
+    onAdd(m,gl){
+      this.map=m;
+      this.renderer=new THREE.WebGLRenderer({
+        canvas:m.getCanvas(),
+        context:gl,
+        antialias:true
+      });
+      this.renderer.autoClear=false;
+    },
+    render(gl,args){
+      const now=performance.now();
+      const dt=Math.min((now-lastT)/1000,.05);
+      lastT=now;
+      if(mixer)mixer.update(dt);
+
+      setAnimation(movingState);
+
+      const terrainElevation=map.queryTerrainElevation([player.lng,player.lat],{exaggerated:false});
+      const elev=Number.isFinite(terrainElevation)?terrainElevation:35;
+      const altitude=elev+jumpOffset+.1;
+      altEl.textContent=Math.round(elev);
+
+      const mc=maplibregl.MercatorCoordinate.fromLngLat([player.lng,player.lat],altitude);
+      const scale=mc.meterInMercatorCoordinateUnits();
+      const rotX=new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(1,0,0),Math.PI/2);
+      const rotZ=new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(0,0,1),-heading*Math.PI/180);
+      const m=new THREE.Matrix4().fromArray(args.defaultProjectionData.mainMatrix);
+      const l=new THREE.Matrix4()
+        .makeTranslation(mc.x,mc.y,mc.z)
+        .scale(new THREE.Vector3(scale,-scale,scale))
+        .multiply(rotX)
+        .multiply(rotZ);
+
+      threeCamera.projectionMatrix=m.multiply(l);
+      this.renderer.resetState();
+      this.renderer.render(playerScene,threeCamera);
+      this.map.triggerRepaint();
+    }
+  };
+  map.addLayer(playerLayer);
+}
+
+const M_PER_LAT=111320;
+function movePlayer(dt){
+  let forward=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0);
+  let side=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
+  const run=keys.ShiftLeft||keys.ShiftRight;
+  const speed=run?6.4:3.5;
+
+  if(keys.Space && grounded){
+    jumpVel=4.8;
+    grounded=false;
+  }
+  jumpVel-=12.8*dt;
+  jumpOffset+=jumpVel*dt;
+  if(jumpOffset<=0){
+    jumpOffset=0;
+    jumpVel=0;
+    grounded=true;
+  }
+
+  if(!forward && !side){
+    currentSpeed=0;
+    movingState=jumpOffset>0?"Idle":"Idle";
+    speedEl.textContent="0";
+    return;
+  }
+
+  const n=Math.hypot(forward,side);
+  forward/=n;
+  side/=n;
+
+  const br=cameraBearing*Math.PI/180;
+  const fEast=Math.sin(br),fNorth=Math.cos(br);
+  const rEast=Math.cos(br),rNorth=-Math.sin(br);
+  const east=fEast*forward+rEast*side;
+  const north=fNorth*forward+rNorth*side;
+
+  heading=(Math.atan2(east,north)*180/Math.PI+360)%360;
+  const meters=speed*dt;
+  const cos=Math.cos(player.lat*Math.PI/180);
+  player.lng+=east*meters/(M_PER_LAT*cos);
+  player.lat+=north*meters/M_PER_LAT;
+
+  player.lng=Math.max(BOUNDS.west+.00008,Math.min(BOUNDS.east-.00008,player.lng));
+  player.lat=Math.max(BOUNDS.south+.00008,Math.min(BOUNDS.north-.00008,player.lat));
+
+  currentSpeed=speed*3.6;
+  speedEl.textContent=Math.round(currentSpeed);
+  movingState=run?"Run":"Walk";
+
+  if(!userLooking){
+    let diff=((heading-cameraBearing+540)%360)-180;
+    cameraBearing=(cameraBearing+diff*Math.min(1,dt*5)+360)%360;
+  }
+}
+
+let lastFrame=performance.now();
+function gameLoop(now){
+  requestAnimationFrame(gameLoop);
+  const dt=Math.min((now-lastFrame)/1000,.04);
+  lastFrame=now;
+  movePlayer(dt);
+
+  if(map.loaded()){
+    map.easeTo({
+      center:[player.lng,player.lat],
+      zoom,
+      pitch:cameraPitch,
+      bearing:cameraBearing,
+      offset:[0,Math.min(145,innerHeight*.18)],
+      duration:0,
+      essential:true
+    });
+  }
+}
+requestAnimationFrame(gameLoop);
+
+map.on("error",e=>{
+  console.warn("Map error",e?.error||e);
+});
+
+window.addEventListener("blur",()=>{
+  for(const k in keys)keys[k]=false;
 });
 </script>
 </body>
