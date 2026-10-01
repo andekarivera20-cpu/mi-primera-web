@@ -1211,148 +1211,205 @@ loadDB=async function(){
 
 
 
-// ===== AUTO MATCH EXPERIENCE 9.4 =====
-// Lightweight real-time match layer: no external assets or libraries.
+// ===== AUTO MATCH EXPERIENCE 9.5 =====
+// Automatic clock + live ball position + contextual commentary. No external assets.
 (function(){
-  let autoTimerV94=null;
-  let activeMatchV94=null;
+  let autoTimerV95=null;
+  let activeMatchV95=null;
 
   const style=document.createElement('style');
   style.textContent=
-    '.flow-card-v94{margin-top:12px;background:#08130e;border:1px solid var(--line);border-radius:13px;padding:10px}'+
-    '.flow-head-v94{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:12px}'+
-    '.flow-pitch-v94{height:168px;position:relative;overflow:hidden;border:2px solid #d8eadb88;border-radius:10px;background:#174d2a}'+
-    '.flow-pitch-v94:before{content:"";position:absolute;left:50%;top:0;bottom:0;border-left:2px solid #d8eadb77}'+
-    '.flow-pitch-v94:after{content:"";position:absolute;width:54px;height:54px;border:2px solid #d8eadb77;border-radius:50%;left:50%;top:50%;transform:translate(-50%,-50%)}'+
-    '.flow-box-v94{position:absolute;top:24%;bottom:24%;width:15%;border:2px solid #d8eadb77}'+
-    '.flow-box-v94.left{left:-2px;border-left:0}.flow-box-v94.right{right:-2px;border-right:0}'+
-    '.flow-ball-v94{position:absolute;width:15px;height:15px;border-radius:50%;background:#fff;border:3px solid #111;transform:translate(-50%,-50%);transition:left .25s linear,top .25s linear;z-index:4;box-shadow:0 1px 5px #0008}'+
-    '.flow-team-v94{position:absolute;bottom:5px;font-size:10px;font-weight:850;background:#07110dcc;padding:3px 6px;border-radius:7px;max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'+
-    '.flow-team-v94.us{left:6px}.flow-team-v94.them{right:6px;text-align:right}'+
-    '.flow-zone-v94{margin-left:auto;color:var(--muted)}'+
-    '.auto-note-v94{font-size:11px;color:var(--muted);margin-top:7px;text-align:center}'+
-    '@media(max-width:680px){.flow-pitch-v94{height:138px}.flow-head-v94{font-size:11px}}';
+    '.flow-card-v95{margin-top:12px;background:#08130e;border:1px solid var(--line);border-radius:13px;padding:10px}'+
+    '.flow-head-v95{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;font-size:12px}'+
+    '.flow-pitch-v95{height:168px;position:relative;overflow:hidden;border:2px solid #d8eadb88;border-radius:10px;background:repeating-linear-gradient(90deg,#174d2a 0 12.5%,#1b5730 12.5% 25%)}'+
+    '.flow-pitch-v95:before{content:"";position:absolute;left:50%;top:0;bottom:0;border-left:2px solid #d8eadb77}'+
+    '.flow-pitch-v95:after{content:"";position:absolute;width:54px;height:54px;border:2px solid #d8eadb77;border-radius:50%;left:50%;top:50%;transform:translate(-50%,-50%)}'+
+    '.flow-box-v95{position:absolute;top:24%;bottom:24%;width:15%;border:2px solid #d8eadb77}'+
+    '.flow-box-v95.left{left:-2px;border-left:0}.flow-box-v95.right{right:-2px;border-right:0}'+
+    '.flow-ball-v95{position:absolute;width:15px;height:15px;border-radius:50%;background:#fff;border:3px solid #111;transform:translate(-50%,-50%);transition:left .45s linear,top .45s linear;z-index:4;box-shadow:0 1px 5px #0008}'+
+    '.flow-team-v95{position:absolute;bottom:5px;font-size:10px;font-weight:850;background:#07110dcc;padding:3px 6px;border-radius:7px;max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'+
+    '.flow-team-v95.us{left:6px}.flow-team-v95.them{right:6px;text-align:right}'+
+    '.flow-zone-v95{margin-left:auto;color:var(--muted)}'+
+    '.auto-note-v95{font-size:11px;color:var(--muted);margin-top:7px;text-align:center}'+
+    '.auto-state-v95{font-weight:900;color:var(--accent2)}'+
+    '@media(max-width:680px){.flow-pitch-v95{height:138px}.flow-head-v95{font-size:11px}}';
   document.head.appendChild(style);
 
-  function stopAutoV94(M){
-    if(autoTimerV94){clearInterval(autoTimerV94);autoTimerV94=null}
-    if(M)M.autoRunningV94=false;
+  function clearTimerV95(){
+    if(autoTimerV95){clearInterval(autoTimerV95);autoTimerV95=null}
+  }
+  function stopAutoV95(M){
+    clearTimerV95();
+    if(M)M.autoRunningV95=false;
   }
 
-  function ensureMatchV94(M){
-    if(M.matchV94Ready)return;
-    M.matchV94Ready=true;
-    M.autoRunningV94=true;
-    M.secondHalfV94=false;
-    M.ballXV94=50;
-    M.ballYV94=50;
-    M.ballOursV94=true;
-    M.nextCommentV94=2;
-    setTimeout(function(){
-      if(!M.done&&M.minute===0&&M.autoRunningV94)startAutoV94(M);
-    },180);
+  function ensureMatchV95(M){
+    activeMatchV95=M;
+    if(M.matchV95Ready)return;
+    M.matchV95Ready=true;
+    M.autoRunningV95=true;
+    M.secondHalfV95=false;
+    M.ballXV95=50;
+    M.ballYV95=50;
+    M.ballOursV95=Math.random()<.5;
+    M.nextCommentV95=1;
+    M.lastFlowTextV95='';
   }
 
-  function zoneV94(M){
-    const x=M.ballXV94||50;
-    if(x<32)return M.ballOursV94?'Salida desde atrás':'Rival cerca de tu área';
-    if(x>68)return M.ballOursV94?'Ataque en último tercio':'Rival saliendo desde atrás';
-    return 'Disputa en medio campo';
+  function zoneV95(M){
+    const x=Number(M.ballXV95||50);
+    if(x<18)return M.ballOursV95?'Salida desde tu área':M.opp+' amenaza tu área';
+    if(x<38)return M.ballOursV95?'Construcción desde atrás':'Defendiendo en campo propio';
+    if(x<62)return 'Centro del campo';
+    if(x<82)return M.ballOursV95?'Ataque en campo rival':M.opp+' intenta salir';
+    return M.ballOursV95?'Zona de peligro':'Salida rival desde su área';
   }
 
-  function playerNameV94(){
-    const field=S.lineup.map(function(id){return S.players.find(function(p){return p.id===id})}).filter(Boolean);
-    return field.length?pick(field).name:S.club;
+  function fieldPlayersV95(){
+    return S.lineup.map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
+  }
+  function randomPlayerV95(filterFn){
+    const arr=fieldPlayersV95().filter(filterFn||(()=>true));
+    return arr.length?pick(arr):null;
   }
 
-  function addFlowCommentV94(M,minute){
-    if(minute<(M.nextCommentV94||0))return;
-    M.nextCommentV94=minute+rnd(2,4);
-    const x=M.ballXV94||50;
+  function addCommentV95(M,minute,force){
+    if(!force&&minute<(M.nextCommentV95||0))return;
+    M.nextCommentV95=minute+rnd(1,3);
+    const x=Number(M.ballXV95||50);
     let text='';
-    if(M.ballOursV94){
-      const p=playerNameV94();
-      if(x<28)text=minute+"' "+p+" recibe atrás y empieza la salida de balón.";
-      else if(x<55)text=minute+"' "+S.club+" mueve la pelota con paciencia por el centro.";
-      else if(x<76)text=minute+"' "+p+" encuentra espacio entre líneas y acelera la jugada.";
-      else{
-        const opts=[
-          minute+"' "+p+" busca el centro desde zona peligrosa.",
-          minute+"' "+S.club+" encierra al rival cerca de su área.",
-          minute+"' "+p+" intenta filtrar el último pase."
-        ];
-        text=pick(opts);
+    if(M.ballOursV95){
+      const p=randomPlayerV95();
+      const defender=randomPlayerV95(q=>/GK|CB|LB|RB|CDM/.test(q.positions||''))||p;
+      const attacker=randomPlayerV95(q=>/ST|CF|LW|RW|CAM|LM|RM/.test(q.positions||''))||p;
+      if(x<25){
+        text=pick([
+          minute+"' "+(defender?.name||S.club)+" juega en corto para iniciar la salida.",
+          minute+"' "+S.club+" reinicia la posesión desde atrás.",
+          minute+"' "+M.opp+" presiona arriba y "+S.club+" intenta salir jugando."
+        ]);
+      }else if(x<55){
+        text=pick([
+          minute+"' "+S.club+" circula la pelota de lado a lado.",
+          minute+"' "+(p?.name||S.club)+" recibe entre líneas y busca una opción.",
+          minute+"' "+S.club+" gana una segunda jugada en el centro del campo.",
+          minute+"' "+(p?.name||S.club)+" cambia la orientación del ataque."
+        ]);
+      }else if(x<78){
+        text=pick([
+          minute+"' "+(attacker?.name||S.club)+" conduce hacia campo rival.",
+          minute+"' "+S.club+" acelera la jugada y encuentra espacio por banda.",
+          minute+"' "+(p?.name||S.club)+" combina cerca del último tercio.",
+          minute+"' "+M.opp+" repliega mientras "+S.club+" mantiene la posesión."
+        ]);
+      }else{
+        text=pick([
+          minute+"' "+(attacker?.name||S.club)+" prepara el centro desde zona peligrosa.",
+          minute+"' "+S.club+" pisa el área y busca el último pase.",
+          minute+"' "+(attacker?.name||S.club)+" intenta romper la defensa con un pase al espacio.",
+          minute+"' "+M.opp+" despeja y evita que "+S.club+" finalice la jugada."
+        ]);
       }
     }else{
-      if(x>72)text=minute+"' "+M.opp+" inicia la jugada desde su defensa.";
-      else if(x>46)text=minute+"' "+M.opp+" trata de superar la presión en medio campo.";
-      else if(x>25)text=minute+"' "+M.opp+" progresa y obliga a "+S.club+" a replegar.";
-      else{
-        const opts=[
-          minute+"' "+M.opp+" llega a zona de ataque y prepara el centro.",
-          minute+"' "+S.club+" defiende cerca de su área ante la presión rival.",
-          minute+"' "+M.opp+" busca un pase al espacio."
-        ];
-        text=pick(opts);
+      if(x>75){
+        text=pick([
+          minute+"' "+M.opp+" comienza la jugada desde su defensa.",
+          minute+"' "+S.club+" adelanta líneas para presionar la salida rival."
+        ]);
+      }else if(x>48){
+        text=pick([
+          minute+"' "+M.opp+" progresa por el centro del campo.",
+          minute+"' "+S.club+" intenta recuperar con presión tras pérdida.",
+          minute+"' "+M.opp+" cambia de banda buscando espacio."
+        ]);
+      }else if(x>22){
+        text=pick([
+          minute+"' "+M.opp+" entra en campo de "+S.club+" y obliga a replegar.",
+          minute+"' "+S.club+" cierra espacios delante del área.",
+          minute+"' "+M.opp+" combina entre líneas."
+        ]);
+      }else{
+        text=pick([
+          minute+"' "+M.opp+" llega a zona peligrosa y prepara el centro.",
+          minute+"' "+S.club+" defiende dentro de su último tercio.",
+          minute+"' "+M.opp+" busca un pase al espacio cerca del área."
+        ]);
       }
     }
-    M.events.push({text:text});
-    if(M.events.length>90)M.events=M.events.slice(-90);
+    if(text&&text!==M.lastFlowTextV95){
+      M.lastFlowTextV95=text;
+      M.events.push({text});
+      if(M.events.length>110)M.events=M.events.slice(-110);
+    }
   }
 
-  function prepareMinuteV94(M){
-    const minute=Math.min(90,M.minute+1);
+  function prepareMinuteV95(M){
+    const next=Math.min(90,M.minute+1);
     const oursProb=clamp((M.momentum||50)/100,.28,.72);
-    if(Math.random()<.16)M.ballOursV94=!M.ballOursV94;
-    else if(Math.random()<.22)M.ballOursV94=Math.random()<oursProb;
+    if(Math.random()<.18)M.ballOursV95=!M.ballOursV95;
+    else if(Math.random()<.18)M.ballOursV95=Math.random()<oursProb;
 
-    const step=rnd(3,10);
-    M.ballXV94=clamp((M.ballXV94||50)+(M.ballOursV94?step:-step),5,95);
-    M.ballYV94=clamp((M.ballYV94||50)+rnd(-14,14),8,92);
+    const step=rnd(2,8);
+    M.ballXV95=clamp(Number(M.ballXV95||50)+(M.ballOursV95?step:-step),5,95);
+    M.ballYV95=clamp(Number(M.ballYV95||50)+rnd(-11,11),8,92);
 
-    if(M.ballXV94>=92){M.ballOursV94=false;M.ballXV94=84}
-    if(M.ballXV94<=8){M.ballOursV94=true;M.ballXV94=16}
-    addFlowCommentV94(M,minute);
+    if(M.ballXV95>=93){M.ballOursV95=false;M.ballXV95=84}
+    if(M.ballXV95<=7){M.ballOursV95=true;M.ballXV95=16}
+
+    addCommentV95(M,next,false);
   }
 
-  function pitchHTMLV94(M){
-    const attacker=M.ballOursV94?S.club:M.opp;
-    return '<div class="flow-card-v94">'+
-      '<div class="flow-head-v94"><strong>⚽ Ataca: '+esc(attacker)+'</strong><span class="flow-zone-v94">'+esc(zoneV94(M))+'</span></div>'+
-      '<div class="flow-pitch-v94" aria-label="Posición aproximada de la pelota">'+
-        '<div class="flow-box-v94 left"></div><div class="flow-box-v94 right"></div>'+
-        '<div class="flow-ball-v94" style="left:'+Number(M.ballXV94||50).toFixed(1)+'%;top:'+Number(M.ballYV94||50).toFixed(1)+'%"></div>'+
-        '<span class="flow-team-v94 us">'+esc(S.club)+'</span><span class="flow-team-v94 them">'+esc(M.opp)+'</span>'+
+  function pitchHTMLV95(M){
+    const attacker=M.ballOursV95?S.club:M.opp;
+    return '<div class="flow-card-v95">'+
+      '<div class="flow-head-v95"><span class="auto-state-v95">'+(M.autoRunningV95?'● EN DIRECTO':'Ⅱ PAUSADO')+'</span><strong>⚽ Ataca: '+esc(attacker)+'</strong><span class="flow-zone-v95">'+esc(zoneV95(M))+'</span></div>'+
+      '<div class="flow-pitch-v95" aria-label="Posición aproximada de la pelota">'+
+        '<div class="flow-box-v95 left"></div><div class="flow-box-v95 right"></div>'+
+        '<div class="flow-ball-v95" style="left:'+Number(M.ballXV95||50).toFixed(1)+'%;top:'+Number(M.ballYV95||50).toFixed(1)+'%"></div>'+
+        '<span class="flow-team-v95 us">'+esc(S.club)+'</span><span class="flow-team-v95 them">'+esc(M.opp)+'</span>'+
       '</div>'+
-      '<div class="auto-note-v94">La pelota muestra la zona aproximada de la jugada; el partido se simula automáticamente.</div>'+
+      '<div class="auto-note-v95">El reloj avanza automáticamente. El campo representa de forma aproximada quién ataca y dónde está la pelota.</div>'+
     '</div>';
   }
 
-  function startAutoV94(M){
-    stopAutoV94();
-    activeMatchV94=M;
-    if(M.done)return;
-    if(M.minute===45&&!M.secondHalfV94){M.autoRunningV94=false;renderMatch(M);return}
-    M.autoRunningV94=true;
-    autoTimerV94=setInterval(function(){
-      if(activeMatchV94!==M||M.done){stopAutoV94(M);return}
-      if(M.minute===45&&!M.secondHalfV94){stopAutoV94(M);renderMatch(M);return}
-      if(M.minute>=90){stopAutoV94(M);return}
-      prepareMinuteV94(M);
-      advanceMatch(M,1);
-      if(M.minute===45&&!M.secondHalfV94){stopAutoV94(M);renderMatch(M)}
-    },900);
+  function tickV95(M){
+    if(activeMatchV95!==M||M.done){stopAutoV95(M);return}
+    if(M.minute===45&&!M.secondHalfV95){stopAutoV95(M);addCommentV95(M,45,true);renderMatch(M);return}
+    if(M.minute>=90){stopAutoV95(M);return}
+    prepareMinuteV95(M);
+    advanceMatch(M,1);
+    if(M.minute===45&&!M.secondHalfV95){stopAutoV95(M);renderMatch(M)}
   }
 
-  const renderMatchV94Base=renderMatch;
-  renderMatch=function(M){
-    ensureMatchV94(M);
-    renderMatchV94Base(M);
+  function startAutoV95(M){
+    clearTimerV95();
+    activeMatchV95=M;
+    if(!M||M.done)return;
+    if(M.minute===45&&!M.secondHalfV95){M.autoRunningV95=false;renderMatch(M);return}
+    M.autoRunningV95=true;
+    autoTimerV95=setInterval(()=>tickV95(M),700);
+  }
 
-    if(M.done)stopAutoV94(M);
+  const openMatchV95Base=openMatch;
+  openMatch=function(f){
+    clearTimerV95();
+    activeMatchV95=null;
+    openMatchV95Base(f);
+    setTimeout(()=>{
+      const M=activeMatchV95;
+      if(M&&!M.done&&M.minute===0)startAutoV95(M);
+    },60);
+  };
+
+  const renderMatchV95Base=renderMatch;
+  renderMatch=function(M){
+    ensureMatchV95(M);
+    renderMatchV95Base(M);
+
+    if(M.done)stopAutoV95(M);
 
     const scoreboard=els.matchBox.querySelector('.scoreboard');
-    if(scoreboard)scoreboard.insertAdjacentHTML('afterend',pitchHTMLV94(M));
+    if(scoreboard)scoreboard.insertAdjacentHTML('afterend',pitchHTMLV95(M));
 
     const playBtn=els.matchBox.querySelector('#step5');
     const halfBtn=els.matchBox.querySelector('#toHT');
@@ -1360,20 +1417,21 @@ loadDB=async function(){
 
     if(playBtn){
       if(M.done){
-        playBtn.disabled=true;
-        playBtn.textContent='Partido finalizado';
-      }else if(M.minute===45&&!M.secondHalfV94){
-        playBtn.textContent='▶ Comenzar 2ª parte';
-        playBtn.onclick=function(){
-          M.secondHalfV94=true;
-          startAutoV94(M);
+        playBtn.disabled=true;playBtn.textContent='Partido finalizado';
+      }else if(M.minute===45&&!M.secondHalfV95){
+        playBtn.disabled=false;playBtn.textContent='▶ Empezar 2ª parte';
+        playBtn.onclick=()=>{
+          M.secondHalfV95=true;
+          M.events.push({text:"▶ 46' Comienza la segunda parte."});
+          startAutoV95(M);
           renderMatch(M);
         };
       }else{
-        playBtn.textContent=M.autoRunningV94?'⏸ Pausar':'▶ Reanudar';
-        playBtn.onclick=function(){
-          if(M.autoRunningV94){stopAutoV94(M);renderMatch(M)}
-          else{startAutoV94(M);renderMatch(M)}
+        playBtn.disabled=false;
+        playBtn.textContent=M.autoRunningV95?'⏸ Pausar':'▶ Reanudar';
+        playBtn.onclick=()=>{
+          if(M.autoRunningV95){stopAutoV95(M);renderMatch(M)}
+          else{startAutoV95(M);renderMatch(M)}
         };
       }
     }
@@ -1381,15 +1439,15 @@ loadDB=async function(){
     if(halfBtn){
       halfBtn.textContent='⏩ Ir al descanso';
       halfBtn.disabled=M.done||M.minute>=45;
-      halfBtn.onclick=function(){
+      halfBtn.onclick=()=>{
         if(M.done||M.minute>=45)return;
-        stopAutoV94(M);
+        stopAutoV95(M);
         while(M.minute<45){
-          prepareMinuteV94(M);
+          prepareMinuteV95(M);
           const jump=Math.min(5,45-M.minute);
           advanceMatch(M,jump);
         }
-        M.autoRunningV94=false;
+        M.autoRunningV95=false;
         renderMatch(M);
       };
     }
@@ -1397,26 +1455,30 @@ loadDB=async function(){
     if(endBtn){
       endBtn.textContent='⏭ Finalizar partido';
       endBtn.disabled=M.done;
-      endBtn.onclick=function(){
+      endBtn.onclick=()=>{
         if(M.done)return;
-        stopAutoV94(M);
-        if(M.minute===45)M.secondHalfV94=true;
+        stopAutoV95(M);
+        if(M.minute===45)M.secondHalfV95=true;
         while(!M.done&&M.minute<90){
-          prepareMinuteV94(M);
+          prepareMinuteV95(M);
           const jump=Math.min(5,90-M.minute);
           advanceMatch(M,jump);
         }
       };
     }
+
+    const c=els.matchBox.querySelector('#commentary');
+    if(c)c.scrollTop=0;
   };
 
-  document.addEventListener('visibilitychange',function(){
-    if(document.hidden&&activeMatchV94&&!activeMatchV94.done&&activeMatchV94.autoRunningV94){
-      stopAutoV94(activeMatchV94);
-      try{renderMatch(activeMatchV94)}catch(e){}
+  document.addEventListener('visibilitychange',()=>{
+    if(document.hidden&&activeMatchV95&&!activeMatchV95.done&&activeMatchV95.autoRunningV95){
+      stopAutoV95(activeMatchV95);
+      try{renderMatch(activeMatchV95)}catch(e){}
     }
   });
 })();
+
 
 loadDB();
 })();
