@@ -1599,6 +1599,80 @@ loadDB=async function(){
   };
 })();
 
+
+// ===== OPTIONAL HALFTIME TALK 9.8 =====
+(function(){
+  const style=document.createElement('style');
+  style.textContent=
+    '.half-talk-v98{margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:12px;background:#0a1510}'+
+    '.half-talk-v98 .talk-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}'+
+    '.half-talk-v98 .talk-done{color:var(--accent2);font-size:11px;font-weight:850;margin-top:6px}';
+  document.head.appendChild(style);
+
+  function applyTalkV98(M,type){
+    if(!M||M.halftimeTalkV98)return;
+    const squad=(S.lineup||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
+    if(type==='motivate'){
+      squad.forEach(p=>p.morale=clamp((p.morale||70)+3,20,100));
+      M.halftimeTalkV98='Motivar';
+      M.events.push({text:"🗣️ Descanso: el entrenador anima al equipo para salir con más energía.",side:'us'});
+    }else if(type==='demand'){
+      squad.forEach(p=>{p.morale=clamp((p.morale||70)+2,20,100);p.fitness=clamp((p.fitness||100)-1,38,100)});
+      M.halftimeTalkV98='Exigir más';
+      M.events.push({text:"🗣️ Descanso: el entrenador exige más intensidad para la segunda parte.",side:'us'});
+    }else if(type==='calm'){
+      squad.forEach(p=>{p.morale=clamp((p.morale||70)+1,20,100);p.fitness=clamp((p.fitness||100)+1,38,100)});
+      M.halftimeTalkV98='Calmar';
+      M.events.push({text:"🗣️ Descanso: el entrenador pide calma, orden y paciencia con balón.",side:'us'});
+    }
+    save();
+  }
+
+  const renderMatchV98Base=renderMatch;
+  renderMatch=function(M){
+    renderMatchV98Base(M);
+
+    if(!M||M.done||M.minute!==45||M.secondHalfV95)return;
+
+    const score=M.home?{us:M.hg,them:M.ag}:{us:M.ag,them:M.hg};
+    const box=document.createElement('div');
+    box.className='half-talk-v98';
+    box.innerHTML=
+      '<div class="row"><strong>🗣️ Charla del descanso</strong><span class="spacer"></span><span class="badge">OPCIONAL</span></div>'+
+      '<div class="muted" style="margin-top:4px">'+
+        (score.us<score.them?'Vas perdiendo. Puedes intentar cambiar la reacción del equipo.':
+         score.us>score.them?'Vas ganando. Puedes reforzar el mensaje o simplemente continuar.':
+         'El partido está empatado. Puedes intervenir o dejar al equipo seguir igual.')+
+      '</div>'+
+      (M.halftimeTalkV98
+        ?'<div class="talk-done">Charla elegida: '+esc(M.halftimeTalkV98)+'</div>'
+        :'<div class="talk-actions">'+
+           '<button class="btn talkV98" data-talk="motivate">💪 Motivar</button>'+
+           '<button class="btn warn talkV98" data-talk="demand">🔥 Exigir más</button>'+
+           '<button class="btn ghost talkV98" data-talk="calm">🧠 Calmar</button>'+
+         '</div>')+
+      '<div class="muted" style="margin-top:7px">No tienes que elegir ninguna. Puedes pulsar directamente “Empezar 2ª parte” y no se aplicará ningún efecto.</div>';
+
+    const scoreBoard=els.matchBox.querySelector('.scoreboard');
+    if(scoreBoard)scoreBoard.insertAdjacentElement('afterend',box);
+    else els.matchBox.prepend(box);
+
+    box.querySelectorAll('.talkV98').forEach(b=>b.onclick=()=>{
+      applyTalkV98(M,b.dataset.talk);
+      renderMatch(M);
+    });
+
+    const startBtn=els.matchBox.querySelector('#step5');
+    if(startBtn){
+      const base=startBtn.onclick;
+      startBtn.onclick=()=>{
+        if(!M.halftimeTalkV98)M.halftimeTalkV98='Sin charla';
+        if(typeof base==='function')base();
+      };
+    }
+  };
+})();
+
 loadDB();
 })();
 </script>
