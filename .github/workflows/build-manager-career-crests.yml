@@ -1,0 +1,155 @@
+name: Build Manager Career Crest Map
+
+on:
+  push:
+    paths:
+      - '.github/workflows/build-manager-career-crests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build exact crest map
+        run: |
+          python - <<'PY'
+          import json, re, unicodedata, urllib.request
+          from pathlib import Path
+
+          CLUBS=Path('manager-career/data/clubs-lite.json')
+          data=json.loads(CLUBS.read_text(encoding='utf-8'))
+          leagues=data['leagues']
+          league_country={
+            '1':'denmark','4':'belgium','10':'netherlands','13':'england','14':'england',
+            '16':'france','17':'france','19':'germany','20':'germany','31':'italy','32':'italy',
+            '41':'norway','50':'scotland','53':'spain','54':'spain','56':'sweden',
+            '65':'republic-of-ireland','66':'poland','68':'turkey','80':'austria',
+            '189':'switzerland','308':'portugal','330':'romania'
+          }
+
+          manual={
+            'FCSB': {'url':'https://logotyp.us/files/fcsb.svg'},
+            'Asociația Clubul Sportiv Petrolul 52':('romania','Petrolul_Ploiești'),
+            'Aarhus Gymnastikforening':('denmark','AGF'),
+            'SK Rapid':('austria','Rapid_Vienna'),
+            '1. FC Köln':('germany','Cologne'),
+            'FC Goa':('india','FC_Goa'),
+            'Palmeiras':('brazil','Palmeiras'),
+            'Rotherham United':('england','Rotherham_United'),
+            'Stade Rennais':('france','Rennes'),
+            'Atlanta United':('usa','Atlanta_United'),
+            'Rodez Aveyron Football':('france','Rodez_AF'),
+            'Südtirol':('italy','Suditrol'),
+            'NorthEast United':('india','NorthEast_United_FC'),
+            'En Avant Guingamp':('france','EA_Guingamp'),
+            'Atlante':('mexico','Atlante_FC'),
+            'DC United':('usa','DC_United'),
+            'Göztepe SK':('turkey','Göztepe_Izmir'),
+            'Sporting Cristal':('peru','Sporting_Cristal'),
+            'NEC Nijmegen':('netherlands','N.E.C._Nijmegen'),
+            'Real Sporting de Gijón':('spain','Sporting_Gijón'),
+            'Royal Charleroi Sporting Club':('belgium','Royal_Charleroi_S.C.'),
+            'Widzew Łódź':('poland','Widzew_Lodz'),
+            'Sønderjyske Fodbold':('denmark','Sonderjyske'),
+            'Odense Boldklub':('denmark','OB'),
+            'FC København':('denmark','F.C._Copenhagen'),
+            'York City':('england','York_City'),
+            'KFUM-Kameratene Oslo':('norway','KFUM'),
+            'Sporting Clube de Braga':('portugal','SC_Braga'),
+            'PSV':('netherlands','PSV_Eindhoven'),
+            'Stade Brestois 29':('france','Brest'),
+            'Brighton & Hove Albion':('england','Brighton'),
+            'Grasshopper Club Zürich':('switzerland','Grasshoppers'),
+            "US Boulogne Cote d'Opale":('france','Boulogne'),
+            'Standard de Liège':('belgium','Standard_Liège'),
+            'FC Argeș':('romania','Argeș_Pitești'),
+            'Vitória SC':('portugal','Vitória_de_Guimarães'),
+            'Excelsior':('netherlands','Excelsior_Rotterdam')
+          }
+
+          def fetch_dir(country):
+              url=f'https://api.github.com/repos/JoseArroyave/football-logos/contents/logos/{country}?ref=main'
+              req=urllib.request.Request(url,headers={'User-Agent':'manager-career'})
+              with urllib.request.urlopen(req,timeout=30) as r:
+                  arr=json.load(r)
+              return [x['name'][:-4] for x in arr if x.get('type')=='file' and x['name'].endswith('.svg')]
+
+          countries=set(league_country.values())
+          for v in manual.values():
+              if isinstance(v,tuple): countries.add(v[0])
+          dirs={c:fetch_dir(c) for c in sorted(countries)}
+
+          def norm(s):
+              s=unicodedata.normalize('NFKD',s or '').encode('ascii','ignore').decode().lower()
+              s=s.replace('&',' and ').replace("'",'')
+              s=re.sub(r'\b(football club|futbol club|futebol clube|club de futbol|club|fc|cf|sc|ac|afc|rc|rcd|cd|ud|ss|as|sv|vfb|vfl|tsg)\b',' ',s)
+              s=re.sub(r'\b(18|19|20)\d{2}\b',' ',s)
+              s=re.sub(r'[^a-z0-9]+',' ',s)
+              return re.sub(r'\s+',' ',s).strip()
+
+          def score(a,b):
+              A,B=norm(a),norm(b)
+              if not A or not B:return 0
+              if A==B:return 1
+              if A in B or B in A:return .86+.1*min(len(A),len(B))/max(len(A),len(B))
+              xa=[A[i:i+2] for i in range(len(A)-1)]
+              yb=[B[i:i+2] for i in range(len(B)-1)]
+              yy=yb[:];m=0
+              for x in xa:
+                  if x in yy:
+                      yy.remove(x);m+=1
+              return 2*m/max(1,len(xa)+len(yb))
+
+          base='https://raw.githubusercontent.com/JoseArroyave/football-logos/refs/heads/main/logos'
+          crest={}
+          unresolved=[]
+          seen=set()
+          for lid,rows in leagues.items():
+              country=league_country.get(lid)
+              if not country: continue
+              for row in rows:
+                  club=row[0]
+                  if club in seen: continue
+                  seen.add(club)
+                  m=manual.get(club)
+                  if isinstance(m,dict):
+                      crest[club]=m['url'];continue
+                  if isinstance(m,tuple):
+                      mc,mf=m
+                      if mf not in dirs.get(mc,[]):
+                          unresolved.append([club,'manual_missing',mc,mf]);continue
+                      crest[club]=f"{base}/{mc}/{urllib.parse.quote(mf)}.svg";continue
+                  best_file=None;best_score=0
+                  for f in dirs.get(country,[]):
+                      sc=score(club,f.replace('_',' '))
+                      if sc>best_score:
+                          best_file,best_score=f,sc
+                  if best_score<0.82:
+                      unresolved.append([club,round(best_score,3),country,best_file]);continue
+                  crest[club]=f"{base}/{country}/{urllib.parse.quote(best_file)}.svg"
+
+          total=len(seen)
+          print('clubs',total,'mapped',len(crest),'unresolved',len(unresolved))
+          if unresolved:
+              print('UNRESOLVED:',unresolved)
+              raise SystemExit(1)
+
+          out={'v':2,'count':len(crest),'crests':crest}
+          Path('manager-career/data/crest-map.json').write_text(
+              json.dumps(out,ensure_ascii=False,separators=(',',':')),encoding='utf-8'
+          )
+          PY
+
+      - name: Commit crest map
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manager-career/data/crest-map.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Build exact crest map for Manager Career"
+          git push
