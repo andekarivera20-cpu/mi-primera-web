@@ -173,7 +173,7 @@ els.country.addEventListener('change',()=>{els.teamPreview.classList.add('hidden
 els.league.addEventListener('change',()=>{els.teamPreview.classList.add('hidden');const clubs=getLeagueClubs(els.league.value).slice().sort();els.team.innerHTML='<option value="">Elige equipo</option>'+clubs.map(c=>`<option>${esc(c)}</option>`).join('');els.team.disabled=false;els.start.disabled=true});
 els.team.addEventListener('change',()=>{els.start.disabled=!els.team.value;updateTeamPreview()});
 els.start.addEventListener('click',()=>{const coach=els.coach.value==='__custom__'?(els.coachCustom.value.trim()||'Entrenador personalizado'):els.coach.value;startCareer(els.team.value,els.league.value,coach)});
-els.continueBtn.addEventListener('click',()=>{try{const raw=localStorage.getItem('managerCareerV5')||localStorage.getItem('managerCareerV4')||localStorage.getItem('managerCareerV3')||localStorage.getItem('managerCareerV2');const saved=JSON.parse(raw);if(!saved)throw Error('sin partida');S=migrateSave(saved);calendarViewMonth=null;enterGame();render('home')}catch(e){console.error(e);toast('No se pudo recuperar la partida guardada')}});
+// V8.3: el manejador de Continuar se instala al final con IndexedDB.
 
 function startCareer(club,lid,coach){
  const leagueClubs=getLeagueClubs(lid);const players=DB.players.map(p=>({...p}));
@@ -229,7 +229,7 @@ function renderTransfers(){const open=isWindowOpen(S.date),squad=getClubPlayers(
 function searchMarket(open){const q=$('#playerSearch').value.trim().toLowerCase();if(q.length<2){toast('Escribe al menos 2 letras');return}const res=S.players.filter(p=>p.club!==S.club&&(p.name.toLowerCase().includes(q)||p.club.toLowerCase().includes(q)||p.positions.toLowerCase().includes(q))).sort((a,b)=>b.overall-a.overall).slice(0,60);const desktop=`<div class="tablewrap mobile-hide"><table><thead><tr><th>Jugador</th><th>Club</th><th>Pos.</th><th>OVR</th><th>Edad</th><th>Valor</th><th></th></tr></thead><tbody>${res.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td>${esc(p.club)}</td><td>${esc(p.positions)}</td><td>${p.overall}</td><td>${p.age}</td><td>${euro(p.value)}</td><td><div class="row"><button class="btn ghost watch" data-id="${p.id}">${(S.shortlist||[]).includes(p.id)?'★':'☆'}</button><button class="btn buy" data-id="${p.id}" ${!open?'disabled':''}>Negociar</button></div></td></tr>`).join('')}</tbody></table></div>`;const mobile=`<div class="mobile-cards">${res.map(p=>`<div class="market-card"><div class="market-card-head"><div><strong>${esc(p.name)}</strong><div class="muted">${esc(p.club)} · ${esc(p.positions)}</div></div><span class="rating">${p.overall}</span></div><div class="player-card-grid"><div class="mini-kpi"><small>Edad</small><strong>${p.age}</strong></div><div class="mini-kpi"><small>Valor</small><strong>${euro(p.value)}</strong></div><div class="mini-kpi"><small>Salario</small><strong>${euro(p.wage||0)}</strong></div></div><div class="row" style="margin-top:10px"><button class="btn ghost watch" data-id="${p.id}">${(S.shortlist||[]).includes(p.id)?'★ Siguiendo':'☆ Seguir'}</button><button class="btn primary buy" data-id="${p.id}" ${!open?'disabled':''}>Negociar</button></div></div>`).join('')}</div>`;$('#searchResults').innerHTML=res.length?desktop+mobile:'<div class="empty">No hay resultados.</div>';$('#searchResults').querySelectorAll('.buy').forEach(b=>b.onclick=()=>openTransferNegotiation(b.dataset.id));$('#searchResults').querySelectorAll('.watch').forEach(b=>b.onclick=()=>{S.shortlist=S.shortlist||[];S.shortlist.includes(b.dataset.id)?S.shortlist=S.shortlist.filter(id=>id!==b.dataset.id):S.shortlist.push(b.dataset.id);searchMarket(open);save()})}
 function buyPlayer(id){openTransferNegotiation(id)}
 function sellPlayer(id){if(!isWindowOpen(S.date))return;const p=S.players.find(x=>x.id===id);if(!p)return;const fee=Math.round(p.value*(.82+Math.random()*.35));const candidates=[...DB.clubs.keys()].filter(c=>c!==S.club);const buyer=pick(candidates);if(confirm(`${buyer} ofrece ${euro(fee)} por ${p.name}. ¿Aceptar?`)){p.club=buyer;S.budget+=fee;S.lineup=S.lineup.filter(x=>x!==id);S.bench=S.bench.filter(x=>x!==id);autoLineup();S.transfers.push({date:S.date,type:'OUT',player:p.name,from:S.club,to:buyer,fee});S.inbox.push({date:S.date,text:`Venta: ${p.name} se marcha a ${buyer} por ${euro(fee)}.`});addNews('Salida del club',`${p.name} ha sido traspasado a ${buyer} por ${euro(fee)}.`,'mercado');render('transfers')}}
-function renderCareer(){const cr=S.careerRecord||S.record;els.view.innerHTML=`<h2>Carrera de ${esc(S.coach)}</h2><div class="grid3"><div class="card"><small class="muted">Reputación</small><div class="big">${Math.round(S.reputation)}</div></div><div class="card"><small class="muted">Partidos carrera</small><div class="big">${cr.p}</div><div class="muted">${cr.w}G · ${cr.d}E · ${cr.l}P</div></div><div class="card"><small class="muted">Títulos</small><div class="big">${cr.trophies||0}</div></div></div><div class="grid2" style="margin-top:14px"><div class="card"><h3>Ofertas de trabajo</h3>${S.offers.length?S.offers.map((o,i)=>`<div class="job-card"><div class="clubline">${crestMarkup(o.club,o.leagueId,'sm')}<div><strong>${esc(o.club)}</strong><br><small class="muted">${esc(EURO_LEAGUES[o.leagueId]?.name||'Liga')} · presupuesto ${euro(o.budget)}</small></div></div><button class="btn primary acceptJob" data-i="${i}">Aceptar</button></div>`).join(''):'<div class="empty">Todavía no tienes ofertas. Los clubes se fijarán en tus resultados y reputación.</div>'}</div><div class="card"><h3>Historial</h3>${S.history.length?S.history.slice().reverse().map(h=>`<div class="msg"><strong>${esc(h.club)}</strong> · ${esc(h.season)}<br><small class="muted">${esc(h.note)}</small></div>`).join(''):'<div class="empty">Tu carrera acaba de empezar.</div>'}<div class="sep"></div><div class="row"><button class="btn danger" id="resign">Dimitir</button><button class="btn ghost" id="newCareer">Nueva carrera</button></div></div></div>`;els.view.querySelectorAll('.acceptJob').forEach(b=>b.onclick=()=>acceptJob(+b.dataset.i));$('#resign').onclick=()=>{if(confirm('¿Seguro que quieres dimitir?')){S.board=0;fireManager(true)}};$('#newCareer').onclick=()=>{if(confirm('¿Borrar esta carrera y empezar una nueva?')){clearCareerSaveV83().then(()=>location.reload())}}}
+function renderCareer(){const cr=S.careerRecord||S.record;els.view.innerHTML=`<h2>Carrera de ${esc(S.coach)}</h2><div class="grid3"><div class="card"><small class="muted">Reputación</small><div class="big">${Math.round(S.reputation)}</div></div><div class="card"><small class="muted">Partidos carrera</small><div class="big">${cr.p}</div><div class="muted">${cr.w}G · ${cr.d}E · ${cr.l}P</div></div><div class="card"><small class="muted">Títulos</small><div class="big">${cr.trophies||0}</div></div></div><div class="grid2" style="margin-top:14px"><div class="card"><h3>Ofertas de trabajo</h3>${S.offers.length?S.offers.map((o,i)=>`<div class="job-card"><div class="clubline">${crestMarkup(o.club,o.leagueId,'sm')}<div><strong>${esc(o.club)}</strong><br><small class="muted">${esc(EURO_LEAGUES[o.leagueId]?.name||'Liga')} · presupuesto ${euro(o.budget)}</small></div></div><button class="btn primary acceptJob" data-i="${i}">Aceptar</button></div>`).join(''):'<div class="empty">Todavía no tienes ofertas. Los clubes se fijarán en tus resultados y reputación.</div>'}</div><div class="card"><h3>Historial</h3>${S.history.length?S.history.slice().reverse().map(h=>`<div class="msg"><strong>${esc(h.club)}</strong> · ${esc(h.season)}<br><small class="muted">${esc(h.note)}</small></div>`).join(''):'<div class="empty">Tu carrera acaba de empezar.</div>'}<div class="sep"></div><div class="row"><button class="btn danger" id="resign">Dimitir</button><button class="btn ghost" id="newCareer">Nueva carrera</button></div></div></div>`;els.view.querySelectorAll('.acceptJob').forEach(b=>b.onclick=()=>acceptJob(+b.dataset.i));$('#resign').onclick=()=>{if(confirm('¿Seguro que quieres dimitir?')){S.board=0;fireManager(true)}};$('#newCareer').onclick=()=>{if(confirm('¿Borrar esta carrera y empezar una nueva?')){clearCareerSaveV83().finally(()=>location.reload())}}}
 function acceptJob(i){const o=S.offers[i];if(!o)return;S.history.push({club:S.club,season:S.season,note:`${S.record.p} partidos · ${S.record.w} victorias`});switchClub(o.club,o.leagueId,o.budget);S.offers=[];toast('Has firmado por '+S.club);render('home')}
 function switchClub(club,lid,budget){const currentDate=S.date;S.club=club;S.leagueId=lid;S.country=EURO_LEAGUES[lid]?.country||'';S.budget=budget||budgetFor(club);S.board=70;S.record={p:0,w:0,d:0,l:0,gf:0,ga:0,trophies:S.record.trophies||0};S.standings={};getLeagueClubs(lid).forEach(c=>S.standings[c]={club:c,p:0,w:0,d:0,l:0,gf:0,ga:0,gd:0,pts:0,rating:clubRating(c)});S.objective=computeObjective(club,lid);S.europeCompetition=null;S.youth=Array.from({length:6},()=>makeYouth());S.academyScoutedSeason=null;S.pendingPress=null;S.pressUsedKey=null;autoLineup();generateLeagueSchedule(getLeagueClubs(lid));generateExtraSchedule();simulateLeagueUntil(currentDate);S.date=currentDate;S.inbox.push({date:S.date,text:`Nuevo reto en ${S.club}. Objetivo de la directiva: ${S.objective.label}.`});addNews(`Nuevo entrenador en ${S.club}`,`${S.coach} acepta el reto. Objetivo: ${S.objective.label}.`,'carrera')}
 function simulateLeagueUntil(date){const rounds=[...new Set(S.leagueFixtures.filter(f=>f.date<date).map(f=>f.round))].sort((a,b)=>a-b);for(const r of rounds){S.leagueFixtures.filter(f=>f.round===r&&!f.played&&f.date<date).forEach(f=>{const [hg,ag]=quickScore((S.standings[f.home]?.rating||clubRating(f.home))+2,S.standings[f.away]?.rating||clubRating(f.away));f.played=true;f.hg=hg;f.ag=ag;updateStanding(f.home,f.away,hg,ag)})}}
@@ -447,7 +447,7 @@ function renderAwardsV7(){ensureV7State();const annual=S.awards||[],monthly=S.mo
 function unlockAchievementV7(id){if(!S)return;S.achievements=S.achievements||[];if(S.achievements.includes(id))return;S.achievements.push(id);const a=V7_ACHIEVEMENTS.find(x=>x.id===id);if(a&&id!=='debut'){addNews('Logro desbloqueado',`${a.icon} ${a.name}: ${a.desc}`,'logro');toast(`Logro: ${a.name}`)}}
 function checkAchievementsV7(){if(!S)return;const cr=S.careerRecord||S.record;if((cr.w||0)>=1)unlockAchievementV7('firstwin');if((cr.w||0)>=10)unlockAchievementV7('tenwins');if((cr.p||0)>=100)unlockAchievementV7('century');if(S.fans>=90)unlockAchievementV7('fans90');if((S.seasonCount||1)>=5)unlockAchievementV7('fiveyear')}
 function renderAchievementsV7(){ensureV7State();els.view.innerHTML=`<div class="row"><h2>Logros de carrera</h2><span class="spacer"></span><span class="badge">${S.achievements.length}/${V7_ACHIEVEMENTS.length}</span></div><div class="achievement-grid">${V7_ACHIEVEMENTS.map(a=>{const ok=S.achievements.includes(a.id);return`<div class="achievement-card ${ok?'unlocked':'locked'}"><div class="ach-icon">${a.icon}</div><strong>${esc(a.name)}</strong><p class="muted">${esc(a.desc)}</p><span class="promise-status ${ok?'done':''}">${ok?'DESBLOQUEADO':'BLOQUEADO'}</span></div>`}).join('')}</div>`}
-function renderCareerV7(){ensureV7State();const cr=S.careerRecord||S.record;els.view.innerHTML=`<h2>Carrera de ${esc(S.coach)}</h2><div class="grid3"><div class="card"><small class="muted">Reputación</small><div class="big">${Math.round(S.reputation)}</div></div><div class="card"><small class="muted">Afición</small><div class="big">${Math.round(S.fans)}%</div></div><div class="card"><small class="muted">Partidos</small><div class="big">${cr.p||0}</div><div class="muted">${cr.w||0}G · ${cr.d||0}E · ${cr.l||0}P</div></div></div><div class="grid2" style="margin-top:14px"><div class="card"><h3>Ofertas de clubes</h3>${S.offers.length?S.offers.map((o,i)=>`<div class="job-card"><div><strong>${esc(o.club)}</strong><br><small class="muted">${esc(EURO_LEAGUES[o.leagueId]?.name||'Liga')}</small></div><button class="btn primary acceptJob" data-i="${i}">Aceptar</button></div>`).join(''):'<div class="empty">Sin ofertas de clubes.</div>'}</div><div class="card"><h3>Selecciones nacionales</h3>${S.nationalJob?`<div class="national-card"><strong>🌐 ${esc(S.nationalJob.team)}</strong><div class="muted">Seleccionador actual · ${S.nationalRecord.w}G ${S.nationalRecord.d}E ${S.nationalRecord.l}P</div><button class="btn danger" id="leaveNational" style="margin-top:8px">Dejar selección</button></div>`:S.nationalOffers.length?S.nationalOffers.map((o,i)=>`<div class="national-card" style="margin-bottom:8px"><strong>${esc(o.team)}</strong><div class="muted">Prestigio ${o.prestige}</div><button class="btn primary natAccept" data-i="${i}" style="margin-top:8px">Aceptar</button></div>`).join(''):'<div class="empty">Las selecciones te llamarán si tu reputación es alta.</div>'}</div></div><div class="card" style="margin-top:14px"><h3>Historial</h3>${S.history.length?S.history.slice().reverse().map(h=>`<div class="msg"><strong>${esc(h.club)}</strong> · ${esc(h.season)}<br><small class="muted">${esc(h.note)}</small></div>`).join(''):'<div class="empty">Tu carrera acaba de empezar.</div>'}<div class="sep"></div><div class="row"><button class="btn danger" id="resign">Dimitir</button><button class="btn ghost" id="newCareer">Nueva carrera</button></div></div>`;els.view.querySelectorAll('.acceptJob').forEach(b=>b.onclick=()=>acceptJob(+b.dataset.i));els.view.querySelectorAll('.natAccept').forEach(b=>b.onclick=()=>{const o=S.nationalOffers[+b.dataset.i];if(!o)return;S.nationalJob={team:o.team,prestige:o.prestige,since:S.date};S.nationalOffers=[];unlockAchievementV7('national');addNews('Nuevo seleccionador',`${S.coach} compaginará ${S.club} con la selección de ${o.team}.`,'selección');render('career')});const ln=$('#leaveNational');if(ln)ln.onclick=()=>{S.nationalJob=null;render('career')};$('#resign').onclick=()=>{if(confirm('¿Seguro que quieres dimitir?')){S.board=0;fireManager(true)}};$('#newCareer').onclick=()=>{if(confirm('¿Borrar esta carrera y empezar una nueva?')){clearCareerSaveV83().then(()=>location.reload())}}}
+function renderCareerV7(){ensureV7State();const cr=S.careerRecord||S.record;els.view.innerHTML=`<h2>Carrera de ${esc(S.coach)}</h2><div class="grid3"><div class="card"><small class="muted">Reputación</small><div class="big">${Math.round(S.reputation)}</div></div><div class="card"><small class="muted">Afición</small><div class="big">${Math.round(S.fans)}%</div></div><div class="card"><small class="muted">Partidos</small><div class="big">${cr.p||0}</div><div class="muted">${cr.w||0}G · ${cr.d||0}E · ${cr.l||0}P</div></div></div><div class="grid2" style="margin-top:14px"><div class="card"><h3>Ofertas de clubes</h3>${S.offers.length?S.offers.map((o,i)=>`<div class="job-card"><div><strong>${esc(o.club)}</strong><br><small class="muted">${esc(EURO_LEAGUES[o.leagueId]?.name||'Liga')}</small></div><button class="btn primary acceptJob" data-i="${i}">Aceptar</button></div>`).join(''):'<div class="empty">Sin ofertas de clubes.</div>'}</div><div class="card"><h3>Selecciones nacionales</h3>${S.nationalJob?`<div class="national-card"><strong>🌐 ${esc(S.nationalJob.team)}</strong><div class="muted">Seleccionador actual · ${S.nationalRecord.w}G ${S.nationalRecord.d}E ${S.nationalRecord.l}P</div><button class="btn danger" id="leaveNational" style="margin-top:8px">Dejar selección</button></div>`:S.nationalOffers.length?S.nationalOffers.map((o,i)=>`<div class="national-card" style="margin-bottom:8px"><strong>${esc(o.team)}</strong><div class="muted">Prestigio ${o.prestige}</div><button class="btn primary natAccept" data-i="${i}" style="margin-top:8px">Aceptar</button></div>`).join(''):'<div class="empty">Las selecciones te llamarán si tu reputación es alta.</div>'}</div></div><div class="card" style="margin-top:14px"><h3>Historial</h3>${S.history.length?S.history.slice().reverse().map(h=>`<div class="msg"><strong>${esc(h.club)}</strong> · ${esc(h.season)}<br><small class="muted">${esc(h.note)}</small></div>`).join(''):'<div class="empty">Tu carrera acaba de empezar.</div>'}<div class="sep"></div><div class="row"><button class="btn danger" id="resign">Dimitir</button><button class="btn ghost" id="newCareer">Nueva carrera</button></div></div>`;els.view.querySelectorAll('.acceptJob').forEach(b=>b.onclick=()=>acceptJob(+b.dataset.i));els.view.querySelectorAll('.natAccept').forEach(b=>b.onclick=()=>{const o=S.nationalOffers[+b.dataset.i];if(!o)return;S.nationalJob={team:o.team,prestige:o.prestige,since:S.date};S.nationalOffers=[];unlockAchievementV7('national');addNews('Nuevo seleccionador',`${S.coach} compaginará ${S.club} con la selección de ${o.team}.`,'selección');render('career')});const ln=$('#leaveNational');if(ln)ln.onclick=()=>{S.nationalJob=null;render('career')};$('#resign').onclick=()=>{if(confirm('¿Seguro que quieres dimitir?')){S.board=0;fireManager(true)}};$('#newCareer').onclick=()=>{if(confirm('¿Borrar esta carrera y empezar una nueva?')){clearCareerSaveV83().finally(()=>location.reload())}}}
 
 function openMatch(f){ensureV7State();const isHome=f.home===S.club,opp=isHome?f.away:f.home;if(S.lineup.length<11||S.lineup.map(id=>S.players.find(p=>p.id===id)).some(p=>!p||isUnavailable(p)))autoLineup();const match={fixture:f,minute:0,hg:0,ag:0,events:[],subs:0,home:isHome,opp,done:false,momentum:50,myShots:0,oppShots:0,suspendedStart:S.players.filter(p=>(p.suspension||0)>0).map(p=>p.id),startingXI:[...S.lineup],subLog:[]};const riv=rivalryLevelV7(S.club,opp),prof=managerProfileV7(opp);match.events.push({text:`👔 Rival: ${prof.name} · estilo ${prof.style}.`});if(riv)match.events.push({text:`🔥 ${riv===2?'Gran derbi / rivalidad histórica':'Partido de rivalidad'}. La afición exige competir.`,cls:'goal'});renderMatch(match);els.matchModal.classList.remove('hidden')}
 function applySub(M,outId,inId){if(M.subs>=5)return;const i=S.lineup.indexOf(outId),j=S.bench.indexOf(inId);if(i<0||j<0)return;S.lineup[i]=inId;S.bench[j]=outId;M.subs++;M.subLog=M.subLog||[];M.subLog.push({outId,inId,minute:M.minute});const a=S.players.find(p=>p.id===outId),b=S.players.find(p=>p.id===inId);M.events.push({text:`🔁 ${M.minute}' Cambio: sale ${a.name}, entra ${b.name}.`});renderMatch(M)}
@@ -852,7 +852,7 @@ loadDB = async function(){
         els.continueBtn.classList.remove('hidden');
         populateCountries();
         els.coverage.textContent='Arranque rápido activado · sin descargar la base completa. Actualizando calendarios…';
-        setTimeout(()=>backgroundSchedulesV81(),50);
+        setTimeout(()=>backgroundSchedulesV81(),4500);
         return;
       }
     }catch(e){console.warn('No se pudo usar arranque rápido',e)}
@@ -866,7 +866,7 @@ loadDB = async function(){
       populateCountries();
       els.coverage.textContent=DB.leagues.size+' ligas europeas · carga local rápida';
       if(rawSave)els.continueBtn.classList.remove('hidden');
-      setTimeout(()=>backgroundSchedulesV81(),50);
+      setTimeout(()=>backgroundSchedulesV81(),4500);
       return;
     }
   }catch(e){console.warn('No se pudo restaurar la caché FC27',e)}
@@ -901,7 +901,7 @@ loadDB = async function(){
     els.loadBar.style.width='100%';els.loadText.textContent='FC 27 lista: '+DB.players.length.toLocaleString('es-ES')+' jugadores · '+DB.clubs.size+' clubes';
     populateCountries();els.coverage.textContent=DB.leagues.size+' ligas europeas · ya puedes empezar, cargando calendarios aparte';
     if(rawSave)els.continueBtn.classList.remove('hidden');
-    setTimeout(()=>backgroundSchedulesV81(),50);
+    setTimeout(()=>backgroundSchedulesV81(),4500);
   }catch(e){
     console.error(e);els.loadBar.style.background='var(--danger)';els.loadText.innerHTML='No se pudo completar la carga. <button id="retryLoadV81" class="btn primary" type="button">Reintentar</button>';
     const r=$('#retryLoadV81'); if(r)r.onclick=()=>location.reload();
@@ -909,92 +909,92 @@ loadDB = async function(){
 };
 
 
-// ===== V8.3 PATCH: 1 MB local FC27 database + fast IndexedDB career saves =====
-const MC_SAVE_STATE_KEY='career-state-v83';
-const MC_SAVE_MARKER='managerCareerHasSaveV83';
-const FC27_LITE_URL='./data/fc27-lite.json';
-let mcSaveTimerV83=null;
-
-async function getCareerSaveV83(){
-  try{
-    const s=await idbGetV82(MC_SAVE_STATE_KEY);
-    if(s?.players?.length)return s;
-  }catch(e){console.warn('Lectura partida IndexedDB',e)}
-  return null;
+// ===== V8.3 PATCH: non-blocking career saves + instant boot metadata =====
+const MC_SAVE_KEY_V83='career-main-v83';
+const MC_SAVE_META_V83='managerCareerSaveMetaV83';
+let saveTimerV83=null, saveInFlightV83=false, saveQueuedV83=false;
+function hasCareerSaveV83(){
+  if(localStorage.getItem(MC_SAVE_META_V83)) return true;
+  return !!(localStorage.getItem('managerCareerV5')||localStorage.getItem('managerCareerV4')||localStorage.getItem('managerCareerV3')||localStorage.getItem('managerCareerV2'));
 }
-async function putCareerSaveV83(state){
-  if(!state)return false;
+function setSaveMetaV83(){
+  try{localStorage.setItem(MC_SAVE_META_V83,JSON.stringify({club:S?.club||'',date:S?.date||'',season:S?.season||'',updated:Date.now()}))}catch(e){}
+}
+async function persistCareerV83(){
+  if(!S)return false;
+  if(saveInFlightV83){saveQueuedV83=true;return false}
+  saveInFlightV83=true;
   try{
-    const ok=await idbSetV82(MC_SAVE_STATE_KEY,state);
-    if(ok)localStorage.setItem(MC_SAVE_MARKER,'1');
+    setSaveMetaV83();
+    const ok=await idbSetV82(MC_SAVE_KEY_V83,S);
+    if(ok){
+      // Only after IndexedDB has the full career, remove the old giant synchronous save.
+      localStorage.removeItem('managerCareerV5');
+      localStorage.removeItem('managerCareerV4');
+      localStorage.removeItem('managerCareerV3');
+      localStorage.removeItem('managerCareerV2');
+    }
     return ok;
-  }catch(e){console.warn('Guardado IndexedDB',e);return false}
+  }catch(e){console.warn('Guardado V8.3',e);return false}
+  finally{
+    saveInFlightV83=false;
+    if(saveQueuedV83){saveQueuedV83=false;setTimeout(()=>persistCareerV83(),120)}
+  }
 }
-async function clearCareerSaveV83(){
-  try{await idbSetV82(MC_SAVE_STATE_KEY,null)}catch(e){}
-  localStorage.removeItem(MC_SAVE_MARKER);
-  ['managerCareerV5','managerCareerV4','managerCareerV3','managerCareerV2'].forEach(k=>localStorage.removeItem(k));
-}
-function legacyCareerRawV83(){
-  return localStorage.getItem('managerCareerV5')||localStorage.getItem('managerCareerV4')||localStorage.getItem('managerCareerV3')||localStorage.getItem('managerCareerV2');
-}
-async function migrateLegacySaveV83(){
-  const raw=legacyCareerRawV83();
+save = function(){
+  if(!S)return;
+  setSaveMetaV83();
+  clearTimeout(saveTimerV83);
+  saveTimerV83=setTimeout(()=>persistCareerV83(),350);
+};
+async function loadCareerV83(){
+  try{
+    const idb=await idbGetV82(MC_SAVE_KEY_V83);
+    if(idb?.club&&idb?.players?.length)return idb;
+  }catch(e){console.warn('Lectura save V8.3',e)}
+  // One-time migration path for old saves. This heavy JSON parse happens only when Continue is pressed.
+  const raw=localStorage.getItem('managerCareerV5')||localStorage.getItem('managerCareerV4')||localStorage.getItem('managerCareerV3')||localStorage.getItem('managerCareerV2');
   if(!raw)return null;
   try{
     const saved=JSON.parse(raw);
-    if(saved?.players?.length){
-      await putCareerSaveV83(saved);
-      ['managerCareerV5','managerCareerV4','managerCareerV3','managerCareerV2'].forEach(k=>localStorage.removeItem(k));
-      return saved;
-    }
-  }catch(e){console.warn('Migración de partida antigua',e)}
+    if(saved){await idbSetV82(MC_SAVE_KEY_V83,saved);setSaveMetaV83();return saved}
+  }catch(e){console.warn('Migración save antiguo',e)}
   return null;
 }
-
-save = function(){
-  if(!S)return;
-  localStorage.setItem(MC_SAVE_MARKER,'1');
-  clearTimeout(mcSaveTimerV83);
-  mcSaveTimerV83=setTimeout(()=>{putCareerSaveV83(S)},220);
-};
-
-function restoreLitePayloadV83(payload){
-  if(!payload?.players?.length)return false;
-  DB={players:[],clubs:new Map(),leagues:new Map()};
-  for(const r of payload.players){
-    if(!Array.isArray(r)||r.length<11)continue;
-    const p={id:String(r[0]||''),name:r[1]||'',full:r[2]||r[1]||'',positions:r[3]||'',overall:+r[4]||50,potential:+r[5]||(+r[4]||50),value:+r[6]||0,wage:+r[7]||0,age:+r[8]||20,club:r[9]||'',leagueId:String(r[10]||''),leagueName:EURO_LEAGUES[String(r[10]||'')]?.name||'',leagueLevel:EURO_LEAGUES[String(r[10]||'')]?.tier||1,nation:r[11]||'',foot:r[12]||'',fitness:100,morale:70,goals:0,assists:0,cards:0,injuredUntil:null,suspension:0,contractUntil:null,squadRole:'Rotación',dataEdition:'FC27'};
-    if(!p.club||!EURO_LEAGUES[p.leagueId])continue;
-    DB.players.push(p);
-    if(!DB.clubs.has(p.club))DB.clubs.set(p.club,{name:p.club,leagueId:p.leagueId});
-  }
-  finishDBV81();
-  return DB.players.length>1000&&DB.clubs.size>50;
+async function clearCareerSaveV83(){
+  try{
+    const db=await idbOpenV82();
+    if(db)await new Promise((resolve,reject)=>{const tx=db.transaction(MC_DB_CACHE_STORE,'readwrite');tx.objectStore(MC_DB_CACHE_STORE).delete(MC_SAVE_KEY_V83);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)});
+  }catch(e){}
+  try{localStorage.removeItem(MC_SAVE_META_V83);localStorage.removeItem('managerCareerV5');localStorage.removeItem('managerCareerV4');localStorage.removeItem('managerCareerV3');localStorage.removeItem('managerCareerV2')}catch(e){}
 }
-async function loadLiteDBV83(){
-  const r=await fetch(FC27_LITE_URL,{cache:'force-cache'});
-  if(!r.ok)throw Error('Base compacta '+r.status);
-  const payload=await r.json();
-  if(!restoreLitePayloadV83(payload))throw Error('Base compacta no válida');
-  return true;
+async function continueCareerV83(){
+  const btn=els.continueBtn;
+  const old=btn.textContent;
+  btn.disabled=true; btn.textContent='Abriendo partida…';
+  els.loadText.textContent='Abriendo tu carrera guardada…';
+  try{
+    const saved=await loadCareerV83();
+    if(!saved)throw Error('sin partida');
+    // If compact base is missing, the saved career itself can reconstruct enough data after the user explicitly continues.
+    if(!DB?.players?.length||DB.players.length<150) rebuildDBFromSavedV81(saved);
+    S=migrateSave(saved); calendarViewMonth=null; enterGame(); render('home');
+    setTimeout(()=>persistCareerV83(),100);
+  }catch(e){console.error(e);toast('No se pudo recuperar la partida guardada');btn.disabled=false;btn.textContent=old}
 }
-function replaceContinueButtonV83(){
-  const old=els.continueBtn;
-  const fresh=old.cloneNode(true);
-  old.parentNode.replaceChild(fresh,old);
-  els.continueBtn=fresh;
-  fresh.addEventListener('click',async()=>{
-    fresh.disabled=true; const prev=fresh.textContent; fresh.textContent='Cargando partida…';
-    try{
-      let saved=await getCareerSaveV83();
-      if(!saved)saved=await migrateLegacySaveV83();
-      if(!saved)throw Error('sin partida');
-      if(!DB.players.length)rebuildDBFromSavedV81(saved);
-      S=migrateSave(saved); calendarViewMonth=null; enterGame(); render('home');
-    }catch(e){console.error(e);toast('No se pudo recuperar la partida guardada')}
-    finally{fresh.disabled=false;fresh.textContent=prev}
-  });
-}
+els.continueBtn.onclick=continueCareerV83;
 
+// V8.3 boot: never parse the giant career save during page startup.
 loadDB = async function(){
+  COACHES.forEach(c=>{if(![...els.coach.options].some(o=>o.value===c))els.coach.add(new Option(c,c))});
+  if(![...els.coach.options].some(o=>o.value==='__custom__'))els.coach.add(new Option('✍️ Otro entrenador…','__custom__'));
+  els.coach.onchange=()=>els.coachCustom.classList.toggle('hidden',els.coach.value!=='__custom__');
+  const hasSave=hasCareerSaveV83();
+  if(hasSave)els.continueBtn.classList.remove('hidden');
+  els.loadText.textContent='Arranque rápido: cargando base local…';
+  els.loadBar.style.width='18%';
+  try{
+    if(await restoreCompactDBV82()){
+      els.loadBar.style.width='100%';
+      els.loadText.textContent='Listo · '+DB.players.length.toLocaleString('es-ES')+' jugadores desde caché local';
+      populateCountries();
