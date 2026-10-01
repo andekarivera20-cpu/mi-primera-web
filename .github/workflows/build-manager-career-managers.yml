@@ -16,16 +16,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build current manager map
+      - name: Fill current manager map safely
         run: |
           python - <<'PY'
-          import csv, io, json, re, time, unicodedata, urllib.request, urllib.parse
+          import csv, io, json, re, unicodedata, urllib.request, urllib.parse, html as htmlmod
           from difflib import SequenceMatcher
           from concurrent.futures import ThreadPoolExecutor, as_completed
           from pathlib import Path
 
-          CLUBS=Path('manager-career/data/clubs-lite.json')
-          data=json.loads(CLUBS.read_text(encoding='utf-8'))
+          clubs_data=json.loads(Path('manager-career/data/clubs-lite.json').read_text(encoding='utf-8'))
+          map_path=Path('manager-career/data/manager-map.json')
+          old=json.loads(map_path.read_text(encoding='utf-8')) if map_path.exists() else {'managers':{}}
+          managers={k:v for k,v in (old.get('managers') or {}).items() if v and v!='Entrenador actual'}
+
           league_country={
             '1':'Denmark','4':'Belgium','10':'Netherlands','13':'England','14':'England',
             '16':'France','17':'France','19':'Germany','20':'Germany','31':'Italy','32':'Italy',
@@ -33,6 +36,18 @@ jobs:
             '65':'Republic of Ireland','66':'Poland','68':'Turkey','80':'Austria',
             '189':'Switzerland','308':'Portugal','330':'Romania'
           }
+
+          # Official/current overrides for clubs that were unresolved in the provider bridge.
+          overrides={
+            'Athletic Club':'Edin Terzić',
+            'Arsenal FC':'Mikel Arteta',
+            'FC Barcelona':'Hansi Flick',
+            'Chelsea FC':'Xabi Alonso',
+            'Crystal Palace':'Pierre Sage',
+            'Everton FC':'David Moyes',
+            'Manchester City':'Enzo Maresca'
+          }
+          managers.update(overrides)
 
           def norm(s):
               s=unicodedata.normalize('NFKD',s or '').encode('ascii','ignore').decode().lower()
@@ -42,226 +57,139 @@ jobs:
               s=re.sub(r'[^a-z0-9]+',' ',s)
               return re.sub(r'\s+',' ',s).strip()
 
-          def get(url,timeout=30):
-              req=urllib.request.Request(url,headers={
-                  'User-Agent':'Mozilla/5.0 ManagerCareer/1.0',
-                  'Accept':'application/json,text/plain,*/*'
-              })
-              with urllib.request.urlopen(req,timeout=timeout) as r:
-                  return r.read().decode('utf-8','replace')
-
-          # Reep supplies stable identity bridges, including Sofascore team ids + Wikidata ids.
-          teams_csv=get('https://raw.githubusercontent.com/withqwerty/reep/main/data/teams.csv',120)
-          rr=csv.DictReader(io.StringIO(teams_csv))
-          by_country={}
-          all_rows=[]
-          for row in rr:
-              name=(row.get('name') or '').strip()
-              if not name: continue
-              rec={
-                  'name':name,
-                  'norm':norm(name),
-                  'country':(row.get('country') or '').strip(),
-                  'sofascore':(row.get('key_sofascore') or '').strip(),
-                  'wikidata':(row.get('key_wikidata') or '').strip()
-              }
-              all_rows.append(rec)
-              by_country.setdefault(rec['country'],[]).append(rec)
-
-          manual_team_alias={
-            'Athletic Club':'Athletic Bilbao',
-            'Atlético Madrid':'Atlético Madrid',
-            'RC Celta':'Celta Vigo',
-            'RC Deportivo A Coruña':'Deportivo La Coruña',
-            'Real Sporting de Gijón':'Sporting Gijón',
-            'Racing Santander':'Racing Santander',
-            'FC København':'FC Copenhagen',
-            'Sønderjyske Fodbold':'Sonderjyske',
-            'Aarhus Gymnastikforening':'AGF',
-            'Odense Boldklub':'OB',
-            'Sporting Clube de Braga':'Braga',
-            'Vitória SC':'Vitória Guimarães',
-            'Grasshopper Club Zürich':'Grasshoppers',
-            'Asociația Clubul Sportiv Petrolul 52':'Petrolul Ploiesti',
-            'FK Bodø/Glimt':'Bodø/Glimt'
-          }
-
-          def score_name(a,b):
+          def score(a,b):
               A,B=norm(a),norm(b)
               if not A or not B:return 0
               if A==B:return 1
-              if A in B or B in A:
-                  return .88+.1*min(len(A),len(B))/max(len(A),len(B))
+              if A in B or B in A:return .88+.1*min(len(A),len(B))/max(len(A),len(B))
               return SequenceMatcher(None,A,B).ratio()
 
-          club_meta=[]
-          for lid,rows in data.get('leagues',{}).items():
-              country=league_country.get(lid,'')
+          def get(url,timeout=40):
+              req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0 ManagerCareer/1.0','Accept':'application/json,text/plain,*/*'})
+              with urllib.request.urlopen(req,timeout=timeout) as r:
+                  return r.read().decode('utf-8','replace')
+
+          all_clubs=[]
+          club_country={}
+          for lid,rows in clubs_data.get('leagues',{}).items():
               for row in rows:
-                  club=row[0]
-                  target=manual_team_alias.get(club,club)
-                  pool=by_country.get(country,[]) or all_rows
-                  best=max(pool,key=lambda r:score_name(target,r['name']),default=None)
-                  sc=score_name(target,best['name']) if best else 0
-                  if sc<.70:
-                      # Retry globally only for difficult provider naming.
-                      best=max(all_rows,key=lambda r:score_name(target,r['name']),default=None)
-                      sc=score_name(target,best['name']) if best else 0
-                  club_meta.append({
-                      'club':club,'lid':lid,'country':country,'match':best,'score':sc
-                  })
+                  c=row[0]
+                  all_clubs.append(c)
+                  club_country[c]=league_country.get(lid,'')
 
-          # Current known override: Athletic announced Edin Terzic for 2026/27 through 2028.
-          overrides={'Athletic Club':'Edin Terzić','Arsenal FC':'Mikel Arteta','FC Barcelona':'Hansi Flick'}
+          missing=[c for c in all_clubs if c not in managers]
 
-          def sofascore_manager(meta):
-              club=meta['club']
-              if club in overrides:return club,overrides[club],'override'
-              rec=meta['match']
-              if not rec or meta['score']<.70 or not rec.get('sofascore'):
-                  return club,None,'no_team_id'
-              try:
-                  raw=get('https://www.sofascore.com/api/v1/team/'+urllib.parse.quote(rec['sofascore']),20)
-                  j=json.loads(raw)
-                  team=j.get('team',j)
-                  mgr=team.get('manager') if isinstance(team,dict) else None
-                  if isinstance(mgr,dict):
-                      name=(mgr.get('name') or mgr.get('shortName') or '').strip()
-                  else:
-                      name=(mgr or '').strip() if isinstance(mgr,str) else ''
-                  if name:return club,name,'sofascore'
-              except Exception:
-                  pass
-              return club,None,'sofascore_missing'
+          teams_csv=get('https://raw.githubusercontent.com/withqwerty/reep/main/data/teams.csv',120)
+          rr=csv.DictReader(io.StringIO(teams_csv))
+          rows=[]
+          by_country={}
+          for r in rr:
+              name=(r.get('name') or '').strip()
+              qid=(r.get('key_wikidata') or '').strip()
+              if not name or not qid:continue
+              rec={'name':name,'qid':qid,'country':(r.get('country') or '').strip()}
+              rows.append(rec)
+              by_country.setdefault(rec['country'],[]).append(rec)
 
-          manager_map={}
-          source_map={}
-          unresolved=[]
-          with ThreadPoolExecutor(max_workers=6) as ex:
-              futs=[ex.submit(sofascore_manager,m) for m in club_meta]
-              for fut in as_completed(futs):
-                  club,name,src=fut.result()
-                  if name:
-                      manager_map[club]=name;source_map[club]=src
-                  else:
-                      unresolved.append(club)
+          aliases={
+            'RC Celta':'Celta Vigo','RC Deportivo A Coruña':'Deportivo La Coruña',
+            'Real Sporting de Gijón':'Sporting Gijón','Aarhus Gymnastikforening':'AGF',
+            'FC København':'FC Copenhagen','Odense Boldklub':'OB','Sønderjyske Fodbold':'Sonderjyske',
+            'Sporting Clube de Braga':'Braga','Vitória SC':'Vitória Guimarães',
+            'Grasshopper Club Zürich':'Grasshoppers','FK Bodø/Glimt':'Bodø/Glimt',
+            'Asociația Clubul Sportiv Petrolul 52':'Petrolul Ploiesti'
+          }
 
-          # Direct SofaScore search fallback for clubs whose identity bridge lacks a usable team id.
-          def direct_search_manager(meta):
-              club=meta['club']
-              if club in manager_map:return club,manager_map[club],'existing'
-              target=manual_team_alias.get(club,club)
-              try:
-                  url='https://www.sofascore.com/api/v1/search/all?q='+urllib.parse.quote(target)
-                  raw=get(url,20)
-                  j=json.loads(raw)
-                  items=j if isinstance(j,list) else (j.get('results') or j.get('entities') or [])
-                  best=None;best_sc=0
-                  for item in items:
-                      ent=item.get('entity',item) if isinstance(item,dict) else {}
-                      if not isinstance(ent,dict):continue
-                      typ=(item.get('type') if isinstance(item,dict) else '') or ent.get('type') or ''
-                      if typ and str(typ).lower() not in {'team','club'}:continue
-                      tid=ent.get('id')
-                      nm=ent.get('name') or ''
-                      if not tid or not nm:continue
-                      sc=score_name(target,nm)
-                      if sc>best_sc:
-                          best=(tid,nm);best_sc=sc
-                  if not best or best_sc<.62:return club,None,'search_no_team'
-                  tid,nm=best
-                  raw=get('https://www.sofascore.com/api/v1/team/'+str(tid),20)
-                  j=json.loads(raw)
-                  team=j.get('team',j)
-                  if not isinstance(team,dict):return club,None,'search_bad_team'
-                  if score_name(target,team.get('name') or nm)<.60:return club,None,'search_name_mismatch'
-                  mgr=team.get('manager')
-                  if isinstance(mgr,dict):
-                      name=(mgr.get('name') or mgr.get('shortName') or '').strip()
-                  else:
-                      name=(mgr or '').strip() if isinstance(mgr,str) else ''
-                  if name:return club,name,'sofascore_search'
-              except Exception:
-                  pass
-              return club,None,'search_missing'
+          club_qid={}
+          for club in missing:
+              target=aliases.get(club,club)
+              pool=by_country.get(club_country.get(club,''),[]) or rows
+              best=max(pool,key=lambda r:score(target,r['name']),default=None)
+              sc=score(target,best['name']) if best else 0
+              if best and sc>=.68:club_qid[club]=best['qid']
 
-          unresolved_now=[m for m in club_meta if m['club'] not in manager_map]
-          with ThreadPoolExecutor(max_workers=5) as ex:
-              futs=[ex.submit(direct_search_manager,m) for m in unresolved_now]
-              for fut in as_completed(futs):
-                  club,name,src=fut.result()
-                  if name:
-                      manager_map[club]=name;source_map[club]=src
-
-          # Wikidata fallback using the matched club's current head coach (P286).
-          missing_meta=[m for m in club_meta if m['club'] not in manager_map and m['match'] and m['match'].get('wikidata')]
-          qid_by_club={m['club']:m['match']['wikidata'] for m in missing_meta}
-          qids=sorted(set(qid_by_club.values()))
-          coach_qid_by_team={}
+          # Resolve Wikipedia sitelinks in batches.
+          qids=sorted(set(club_qid.values()))
+          sitelinks={}
           for i in range(0,len(qids),40):
               batch=qids[i:i+40]
               try:
-                  url='https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=claims&ids='+urllib.parse.quote('|'.join(batch))
-                  ents=json.loads(get(url,30)).get('entities',{})
-                  for qid,obj in ents.items():
-                      claims=(obj.get('claims') or {}).get('P286') or []
-                      # Prefer statements without an end-time qualifier.
-                      active=[]
-                      for c in claims:
-                          quals=c.get('qualifiers') or {}
-                          if 'P582' not in quals and c.get('mainsnak',{}).get('datavalue'):
-                              active.append(c)
-                      use=(active or claims)
-                      if use:
-                          v=use[-1].get('mainsnak',{}).get('datavalue',{}).get('value',{})
-                          cq=v.get('id') if isinstance(v,dict) else None
-                          if cq:coach_qid_by_team[qid]=cq
+                  url='https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=sitelinks&sitefilter=enwiki|eswiki&ids='+urllib.parse.quote('|'.join(batch))
+                  ents=json.loads(get(url)).get('entities',{})
+                  for q,obj in ents.items():
+                      sl=obj.get('sitelinks') or {}
+                      if sl.get('enwiki'):sitelinks[q]=('en',sl['enwiki']['title'])
+                      elif sl.get('eswiki'):sitelinks[q]=('es',sl['eswiki']['title'])
               except Exception:
                   pass
 
-          coach_qids=sorted(set(coach_qid_by_team.values()))
-          coach_labels={}
-          for i in range(0,len(coach_qids),40):
-              batch=coach_qids[i:i+40]
+          def clean_wiki_value(v):
+              v=re.sub(r'<ref[^>]*>.*?</ref>','',v,flags=re.I|re.S)
+              v=re.sub(r'<ref[^>]*/>','',v,flags=re.I)
+              # Preserve the useful final parameter of simple formatting templates.
+              for _ in range(5):
+                  nv=re.sub(r'\{\{[^{}]*?\|\s*([^{}|]+(?:\[\[[^{}]+?\]\])?[^{}|]*)\}\}',lambda m:m.group(1),v)
+                  if nv==v:break
+                  v=nv
+              v=re.sub(r'\{\{[^{}]+\}\}','',v)
+              v=re.sub(r'\[\[([^\]|]+)\|([^\]]+)\]\]',r'\2',v)
+              v=re.sub(r'\[\[([^\]]+)\]\]',r'\1',v)
+              v=re.sub(r'<[^>]+>','',v)
+              v=v.replace("'''",'').replace("''",'')
+              v=htmlmod.unescape(v)
+              v=re.sub(r'\s+',' ',v).strip(' |')
+              return v
+
+          def wiki_manager(club):
+              q=club_qid.get(club)
+              if not q or q not in sitelinks:return club,None
+              lang,title=sitelinks[q]
+              host='en.wikipedia.org' if lang=='en' else 'es.wikipedia.org'
               try:
-                  url='https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=labels&languages=en|es&ids='+urllib.parse.quote('|'.join(batch))
-                  ents=json.loads(get(url,30)).get('entities',{})
-                  for qid,obj in ents.items():
-                      labels=obj.get('labels') or {}
-                      lab=(labels.get('es') or labels.get('en') or {}).get('value')
-                      if lab:coach_labels[qid]=lab
+                  url='https://'+host+'/w/api.php?action=query&format=json&formatversion=2&prop=revisions&rvprop=content&rvslots=main&titles='+urllib.parse.quote(title)
+                  j=json.loads(get(url,30))
+                  pages=j.get('query',{}).get('pages',[])
+                  if not pages:return club,None
+                  revs=pages[0].get('revisions') or []
+                  if not revs:return club,None
+                  slots=revs[0].get('slots') or {}
+                  text=(slots.get('main') or {}).get('content') or revs[0].get('*') or ''
+                  patterns=[
+                    r'^\|\s*manager\s*=\s*(.+)$',
+                    r'^\|\s*head[_ ]coach\s*=\s*(.+)$',
+                    r'^\|\s*coach\s*=\s*(.+)$',
+                    r'^\|\s*entrenador\s*=\s*(.+)$'
+                  ]
+                  for pat in patterns:
+                      m=re.search(pat,text,flags=re.I|re.M)
+                      if m:
+                          name=clean_wiki_value(m.group(1))
+                          if name and len(name)<100 and name.lower() not in {'vacant','none','n/a','-'}:
+                              return club,name
               except Exception:
                   pass
+              return club,None
 
-          for club,qid in qid_by_club.items():
-              if club in manager_map:continue
-              cq=coach_qid_by_team.get(qid)
-              name=coach_labels.get(cq)
-              if name:
-                  manager_map[club]=name;source_map[club]='wikidata'
+          with ThreadPoolExecutor(max_workers=5) as ex:
+              futs=[ex.submit(wiki_manager,c) for c in missing if c not in managers]
+              for fut in as_completed(futs):
+                  club,name=fut.result()
+                  if name:managers[club]=name
 
-          # Never leave the UI blank; unresolved clubs use a neutral placeholder.
-          all_clubs=[m['club'] for m in club_meta]
-          unresolved=[c for c in all_clubs if c not in manager_map]
-          for c in unresolved:
-              manager_map[c]='Entrenador actual'
-              source_map[c]='fallback'
+          # Preserve every club key. Anything still missing is explicitly flagged for later manual review.
+          unresolved=[c for c in all_clubs if c not in managers]
+          for c in unresolved:managers[c]='Entrenador actual'
 
           out={
-              'v':1,
-              'generated':'2026-10-01',
-              'count':len(manager_map),
-              'resolved':sum(1 for c in all_clubs if source_map.get(c)!='fallback'),
-              'fallback':sum(1 for c in all_clubs if source_map.get(c)=='fallback'),
-              'managers':manager_map
+              'v':2,'generated':'2026-10-01','count':len(managers),
+              'resolved':len(all_clubs)-len(unresolved),'fallback':len(unresolved),
+              'managers':managers
           }
-          Path('manager-career/data/manager-map.json').write_text(
-              json.dumps(out,ensure_ascii=False,separators=(',',':')),encoding='utf-8'
-          )
-          print('clubs',len(all_clubs),'map',len(manager_map),'resolved',out['resolved'],'fallback',out['fallback'])
-          print('Athletic Club ->',manager_map.get('Athletic Club'))
-          if out['resolved']<250:
-              raise SystemExit('Too few real manager mappings; refusing weak build')
+          map_path.write_text(json.dumps(out,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+          print('clubs',len(all_clubs),'resolved',out['resolved'],'fallback',out['fallback'])
+          print('unresolved',unresolved)
+          print('Athletic',managers.get('Athletic Club'),'Arsenal',managers.get('Arsenal FC'),'Barcelona',managers.get('FC Barcelona'))
+          if out['resolved']<300:raise SystemExit('Manager coverage regressed below safe baseline')
           PY
 
       - name: Commit manager map
@@ -270,7 +198,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add manager-career/data/manager-map.json
           git diff --cached --quiet && exit 0
-          git commit -m "Build current manager map for Manager Career"
+          git commit -m "Complete current manager map"
           git push
-
-# second-pass direct club search
