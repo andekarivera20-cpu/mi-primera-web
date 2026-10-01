@@ -77,6 +77,8 @@ jobs:
                   all_clubs.append(c)
                   club_country[c]=league_country.get(lid,'')
 
+          valid_clubs=set(all_clubs)
+          managers={k:v for k,v in managers.items() if k in valid_clubs}
           missing=[c for c in all_clubs if c not in managers]
 
           # Small targeted SofaScore pass only for unresolved clubs.
@@ -214,6 +216,180 @@ jobs:
                   club,name=fut.result()
                   if name:managers[club]=name
 
+          # Direct Wikipedia search fallback for club names that lacked a reliable identity bridge.
+          def wiki_search_manager(club):
+              country=club_country.get(club,'')
+              queries=[club+' football club '+country, club+' '+country]
+              for lang in ['en','es']:
+                  host='en.wikipedia.org' if lang=='en' else 'es.wikipedia.org'
+                  for query in queries:
+                      try:
+                          surl='https://'+host+'/w/api.php?action=query&format=json&list=search&srlimit=5&srsearch='+urllib.parse.quote(query)
+                          sj=json.loads(get(surl,30))
+                          hits=sj.get('query',{}).get('search',[])
+                          for hit in hits:
+                              title=hit.get('title') or ''
+                              if not title:continue
+                              if score(club,title)<.45 and norm(club) not in norm(title) and norm(title) not in norm(club):continue
+                              purl='https://'+host+'/w/api.php?action=query&format=json&formatversion=2&prop=revisions&rvprop=content&rvslots=main&titles='+urllib.parse.quote(title)
+                              pj=json.loads(get(purl,30))
+                              pages=pj.get('query',{}).get('pages',[])
+                              if not pages:continue
+                              revs=pages[0].get('revisions') or []
+                              if not revs:continue
+                              slots=revs[0].get('slots') or {}
+                              text=(slots.get('main') or {}).get('content') or revs[0].get('*') or ''
+                              patterns=[
+                                r'^\|\s*manager\s*=\s*(.+)
+          for c in unresolved:managers[c]='Entrenador actual'
+
+          out={
+              'v':2,'generated':'2026-10-01','count':len(managers),
+              'resolved':len(all_clubs)-len(unresolved),'fallback':len(unresolved),
+              'managers':managers
+          }
+          map_path.write_text(json.dumps(out,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+          print('clubs',len(all_clubs),'resolved',out['resolved'],'fallback',out['fallback'])
+          print('unresolved',unresolved)
+          print('Athletic',managers.get('Athletic Club'),'Arsenal',managers.get('Arsenal FC'),'Barcelona',managers.get('FC Barcelona'))
+          if out['resolved']<300:raise SystemExit('Manager coverage regressed below safe baseline')
+          PY
+
+      - name: Commit manager map
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manager-career/data/manager-map.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Complete current manager map"
+          git push
+
+# targeted unresolved-manager refresh
+,
+                                r'^\|\s*head[_ ]coach\s*=\s*(.+)
+          for c in unresolved:managers[c]='Entrenador actual'
+
+          out={
+              'v':2,'generated':'2026-10-01','count':len(managers),
+              'resolved':len(all_clubs)-len(unresolved),'fallback':len(unresolved),
+              'managers':managers
+          }
+          map_path.write_text(json.dumps(out,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+          print('clubs',len(all_clubs),'resolved',out['resolved'],'fallback',out['fallback'])
+          print('unresolved',unresolved)
+          print('Athletic',managers.get('Athletic Club'),'Arsenal',managers.get('Arsenal FC'),'Barcelona',managers.get('FC Barcelona'))
+          if out['resolved']<300:raise SystemExit('Manager coverage regressed below safe baseline')
+          PY
+
+      - name: Commit manager map
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manager-career/data/manager-map.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Complete current manager map"
+          git push
+
+# targeted unresolved-manager refresh
+,
+                                r'^\|\s*coach\s*=\s*(.+)
+          for c in unresolved:managers[c]='Entrenador actual'
+
+          out={
+              'v':2,'generated':'2026-10-01','count':len(managers),
+              'resolved':len(all_clubs)-len(unresolved),'fallback':len(unresolved),
+              'managers':managers
+          }
+          map_path.write_text(json.dumps(out,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+          print('clubs',len(all_clubs),'resolved',out['resolved'],'fallback',out['fallback'])
+          print('unresolved',unresolved)
+          print('Athletic',managers.get('Athletic Club'),'Arsenal',managers.get('Arsenal FC'),'Barcelona',managers.get('FC Barcelona'))
+          if out['resolved']<300:raise SystemExit('Manager coverage regressed below safe baseline')
+          PY
+
+      - name: Commit manager map
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manager-career/data/manager-map.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Complete current manager map"
+          git push
+
+# targeted unresolved-manager refresh
+,
+                                r'^\|\s*entrenador\s*=\s*(.+)
+          for c in unresolved:managers[c]='Entrenador actual'
+
+          out={
+              'v':2,'generated':'2026-10-01','count':len(managers),
+              'resolved':len(all_clubs)-len(unresolved),'fallback':len(unresolved),
+              'managers':managers
+          }
+          map_path.write_text(json.dumps(out,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+          print('clubs',len(all_clubs),'resolved',out['resolved'],'fallback',out['fallback'])
+          print('unresolved',unresolved)
+          print('Athletic',managers.get('Athletic Club'),'Arsenal',managers.get('Arsenal FC'),'Barcelona',managers.get('FC Barcelona'))
+          if out['resolved']<300:raise SystemExit('Manager coverage regressed below safe baseline')
+          PY
+
+      - name: Commit manager map
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manager-career/data/manager-map.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Complete current manager map"
+          git push
+
+# targeted unresolved-manager refresh
+,
+                                r'^\|\s*manager_title\s*=.*?\n\|\s*manager\s*=\s*(.+)
+          for c in unresolved:managers[c]='Entrenador actual'
+
+          out={
+              'v':2,'generated':'2026-10-01','count':len(managers),
+              'resolved':len(all_clubs)-len(unresolved),'fallback':len(unresolved),
+              'managers':managers
+          }
+          map_path.write_text(json.dumps(out,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+          print('clubs',len(all_clubs),'resolved',out['resolved'],'fallback',out['fallback'])
+          print('unresolved',unresolved)
+          print('Athletic',managers.get('Athletic Club'),'Arsenal',managers.get('Arsenal FC'),'Barcelona',managers.get('FC Barcelona'))
+          if out['resolved']<300:raise SystemExit('Manager coverage regressed below safe baseline')
+          PY
+
+      - name: Commit manager map
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manager-career/data/manager-map.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Complete current manager map"
+          git push
+
+# targeted unresolved-manager refresh
+
+                              ]
+                              for pat in patterns:
+                                  m=re.search(pat,text,flags=re.I|re.M)
+                                  if m:
+                                      name=clean_wiki_value(m.group(1))
+                                      name=re.sub(r'\s*\([^)]*(?:caretaker|interim|c)|interino[^)]*\)\s*','',name,flags=re.I).strip()
+                                      if name and 2<len(name)<100 and name.lower() not in {'vacant','none','n/a','-'}:
+                                          return club,name
+                      except Exception:
+                          pass
+              return club,None
+
+          still_missing=[c for c in all_clubs if c not in managers]
+          if still_missing:
+              with ThreadPoolExecutor(max_workers=3) as ex:
+                  futs=[ex.submit(wiki_search_manager,c) for c in still_missing]
+                  for fut in as_completed(futs):
+                      club,name=fut.result()
+                      if name:managers[club]=name
+
           # Preserve every club key. Anything still missing is explicitly flagged for later manual review.
           unresolved=[c for c in all_clubs if c not in managers]
           for c in unresolved:managers[c]='Entrenador actual'
@@ -240,3 +416,5 @@ jobs:
           git push
 
 # targeted unresolved-manager refresh
+
+# retry after data-build push conflict and direct Wikipedia fallback
