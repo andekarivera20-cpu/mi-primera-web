@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recordatorios de citas</title>
+<meta name="theme-color" content="#111827">
+<style>
+:root{--bg:#f4f7fb;--card:#fff;--ink:#172033;--muted:#6b7280;--line:#e6eaf0;--accent:#111827;--ok:#0f9f6e;--warn:#d97706;--danger:#dc2626;--soft:#eef2f7}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
+button,input,select,textarea{font:inherit}button{cursor:pointer}
+.shell{max-width:1180px;margin:0 auto;padding:24px}
+.topbar{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:22px}
+.brand{display:flex;gap:12px;align-items:center}.logo{width:42px;height:42px;border-radius:14px;background:var(--accent);display:grid;place-items:center;color:#fff;font-weight:800}
+.brand h1{margin:0;font-size:21px}.brand p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.badge{padding:8px 11px;border-radius:999px;background:#e9fff6;color:#087451;font-size:12px;font-weight:700}
+.grid{display:grid;grid-template-columns:1.05fr 1.95fr;gap:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:0 8px 30px rgba(15,23,42,.04)}
+.cardpad{padding:20px}.card h2{font-size:17px;margin:0 0 4px}.sub{color:var(--muted);font-size:13px;margin:0 0 18px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}.stat{background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px}.stat .n{font-size:25px;font-weight:800}.stat .t{font-size:12px;color:var(--muted);margin-top:3px}
+.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}.field label{font-size:12px;font-weight:700}.field input,.field select,.field textarea{border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff;outline:none}.field input:focus,.field select:focus,.field textarea:focus{border-color:#9ca3af;box-shadow:0 0 0 3px #eef2f7}
+.actions{display:flex;gap:9px;margin-top:15px;flex-wrap:wrap}.btn{border:0;border-radius:12px;padding:11px 14px;font-weight:750}.btn.primary{background:var(--accent);color:#fff}.btn.secondary{background:var(--soft);color:var(--ink)}.btn.danger{background:#fff1f2;color:#b91c1c}.btn.small{padding:8px 10px;font-size:12px}
+.toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}.search{flex:1;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.list{display:flex;flex-direction:column;gap:10px}.appt{border:1px solid var(--line);border-radius:16px;padding:14px}.appttop{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.who{font-weight:800}.meta{font-size:13px;color:var(--muted);margin-top:4px;line-height:1.45}.status{font-size:11px;font-weight:800;padding:6px 9px;border-radius:999px;white-space:nowrap}.status.pending{background:#fff7ed;color:#b45309}.status.sent{background:#ecfdf5;color:#047857}.status.cancelled{background:#fef2f2;color:#b91c1c}.status.done{background:#eef2ff;color:#4338ca}
+.rowactions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}.empty{padding:34px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:16px}
+.note{margin-top:18px;padding:14px;border-radius:14px;background:#f8fafc;border:1px solid var(--line);font-size:13px;line-height:1.5}.note strong{display:block;margin-bottom:4px}
+.preview{background:#0f172a;color:#fff;border-radius:14px;padding:14px;font-size:13px;line-height:1.5;min-height:90px;white-space:pre-wrap}
+.footer{color:var(--muted);font-size:12px;text-align:center;margin:22px 0 4px}
+@media(max-width:840px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr 1fr}.shell{padding:14px}.topbar{align-items:flex-start}.formgrid{grid-template-columns:1fr}.field.full{grid-column:auto}}
+@media(max-width:520px){.stats{grid-template-columns:1fr}.appttop{flex-direction:column}.badge{display:none}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">RC</div>
+      <div><h1>Recordatorios de citas</h1><p>Panel sencillo para negocios con cita previa</p></div>
+    </div>
+    <div class="badge">Demo funcional</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n" id="statToday">0</div><div class="t">Citas hoy</div></div>
+    <div class="stat"><div class="n" id="statTomorrow">0</div><div class="t">Citas mañana</div></div>
+    <div class="stat"><div class="n" id="statPending">0</div><div class="t">Recordatorios pendientes</div></div>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="card cardpad">
+        <h2>Nueva cita</h2>
+        <p class="sub">El negocio mete la cita y el sistema prepara el recordatorio.</p>
+        <form id="apptForm">
+          <div class="formgrid">
+            <div class="field full"><label>Nombre del cliente</label><input id="client" required placeholder="Ej. Andeka"></div>
+            <div class="field"><label>Teléfono</label><input id="phone" required placeholder="Ej. 607 775 804"></div>
+            <div class="field"><label>Trabajador</label><input id="worker" placeholder="Ej. Iker"></div>
+            <div class="field"><label>Fecha</label><input id="date" type="date" required></div>
+            <div class="field"><label>Hora</label><input id="time" type="time" required></div>
+            <div class="field full"><label>Servicio</label><input id="service" placeholder="Ej. Corte + barba"></div>
+            <div class="field"><label>Recordar</label><select id="reminder"><option value="24">24 h antes</option><option value="2">2 h antes</option><option value="48">48 h antes</option></select></div>
+            <div class="field"><label>Canal</label><select id="channel"><option>WhatsApp</option><option>SMS</option><option>Email</option></select></div>
+          </div>
+          <div class="actions">
+            <button class="btn primary" type="submit">Guardar cita</button>
+            <button class="btn secondary" type="button" id="demoBtn">Cargar ejemplo</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card cardpad" style="margin-top:18px">
+        <h2>Mensaje</h2>
+        <p class="sub">Vista previa de lo que recibirá el cliente.</p>
+        <div class="preview" id="preview"></div>
+        <div class="note">
+          <strong>Automatización real</strong>
+          Esta demo guarda las citas y prepara el mensaje. Para que WhatsApp o SMS se envíen solos aunque el navegador esté cerrado, conectaremos un servicio oficial de mensajería en el siguiente paso.
+        </div>
+      </div>
+    </div>
+
+    <div class="card cardpad">
+      <div class="toolbar">
+        <div><h2>Citas</h2><p class="sub" style="margin:3px 0 0">Próximas citas y estado del recordatorio</p></div>
+        <input class="search" id="search" placeholder="Buscar cliente..." style="max-width:220px">
+      </div>
+      <div class="list" id="list"></div>
+    </div>
+  </div>
+  <div class="footer">Los datos de esta demo se guardan únicamente en este navegador.</div>
+</div>
+
+<script>
+(function(){
+  var KEY='recordatorios_citas_v1';
+  var appointments=[];
+  var editingId=null;
+
+  function load(){
+    try{appointments=JSON.parse(localStorage.getItem(KEY)||'[]');}catch(e){appointments=[];}
+    if(!appointments.length){
+      var d=new Date(); d.setDate(d.getDate()+1);
+      var iso=d.toISOString().slice(0,10);
+      appointments=[{id:Date.now(),client:'Cliente de ejemplo',phone:'600123123',worker:'Iker',date:iso,time:'18:00',service:'Corte',reminder:'24',channel:'WhatsApp',status:'pending'}];
+      save();
+    }
+  }
+  function save(){localStorage.setItem(KEY,JSON.stringify(appointments));}
+  function esc(s){return String(s||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function cleanPhone(p){return String(p||'').replace(/\D/g,'').replace(/^00/,'');}
+  function dt(a){return new Date(a.date+'T'+a.time+':00');}
+  function fmtDate(a){
+    var d=dt(a);
+    return d.toLocaleDateString('es-ES',{weekday:'short',day:'2-digit',month:'short'})+' · '+a.time;
+  }
+  function message(a){
+    var service=a.service?' para '+a.service:'';
+    var worker=a.worker?' con '+a.worker:'';
+    return 'Hola '+a.client+' 👋\\nTe recordamos que tienes una cita mañana a las '+a.time+service+worker+'.\\nSi no puedes venir, avísanos con tiempo. ¡Gracias!';
+  }
+  function statusText(s){return s==='sent'?'Enviado':s==='cancelled'?'Cancelada':s==='done'?'Realizada':'Pendiente';}
+  function sameDay(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();}
+  function renderStats(){
+    var now=new Date(), tom=new Date(); tom.setDate(now.getDate()+1);
+    document.getElementById('statToday').textContent=appointments.filter(function(a){return sameDay(dt(a),now)&&a.status!=='cancelled';}).length;
+    document.getElementById('statTomorrow').textContent=appointments.filter(function(a){return sameDay(dt(a),tom)&&a.status!=='cancelled';}).length;
+    document.getElementById('statPending').textContent=appointments.filter(function(a){return a.status==='pending';}).length;
+  }
+  function render(){
+    var q=document.getElementById('search').value.trim().toLowerCase();
+    var list=document.getElementById('list');
+    var rows=appointments.slice().sort(function(a,b){return dt(a)-dt(b);}).filter(function(a){
+      return !q || (a.client+' '+a.phone+' '+a.service+' '+a.worker).toLowerCase().indexOf(q)>=0;
+    });
+    if(!rows.length){list.innerHTML='<div class="empty">No hay citas que mostrar.</div>'; renderStats(); return;}
+    list.innerHTML=rows.map(function(a){
+      return '<div class="appt">'+
+        '<div class="appttop"><div><div class="who">'+esc(a.client)+'</div>'+
+        '<div class="meta">'+esc(fmtDate(a))+(a.service?' · '+esc(a.service):'')+(a.worker?' · '+esc(a.worker):'')+'<br>'+esc(a.phone)+' · '+esc(a.channel)+' · '+esc(a.reminder)+' h antes</div></div>'+
+        '<span class="status '+esc(a.status)+'">'+statusText(a.status)+'</span></div>'+
+        '<div class="rowactions">'+
+          '<button class="btn secondary small" onclick="appSend('+a.id+')">Enviar WhatsApp</button>'+
+          '<button class="btn secondary small" onclick="appMark('+a.id+',\\'sent\\')">Marcar enviado</button>'+
+          '<button class="btn secondary small" onclick="appEdit('+a.id+')">Editar</button>'+
+          '<button class="btn danger small" onclick="appDelete('+a.id+')">Eliminar</button>'+
+        '</div></div>';
+    }).join('');
+    renderStats();
+  }
+  function updatePreview(){
+    var a={client:document.getElementById('client').value||'Andeka',time:document.getElementById('time').value||'18:00',service:document.getElementById('service').value,worker:document.getElementById('worker').value};
+    document.getElementById('preview').textContent=message(a);
+  }
+  document.getElementById('apptForm').addEventListener('submit',function(e){
+    e.preventDefault();
+    var obj={id:editingId||Date.now(),client:document.getElementById('client').value.trim(),phone:document.getElementById('phone').value.trim(),worker:document.getElementById('worker').value.trim(),date:document.getElementById('date').value,time:document.getElementById('time').value,service:document.getElementById('service').value.trim(),reminder:document.getElementById('reminder').value,channel:document.getElementById('channel').value,status:'pending'};
+    if(editingId){
+      appointments=appointments.map(function(a){if(a.id===editingId){obj.status=a.status;}return a.id===editingId?obj:a;});
+    }else appointments.push(obj);
+    editingId=null; save(); this.reset(); setDefaultDate(); updatePreview(); render();
+  });
+  document.getElementById('search').addEventListener('input',render);
+  ['client','time','service','worker'].forEach(function(id){document.getElementById(id).addEventListener('input',updatePreview);});
+  document.getElementById('demoBtn').addEventListener('click',function(){
+    var d=new Date(); d.setDate(d.getDate()+2);
+    document.getElementById('client').value='Mikel';
+    document.getElementById('phone').value='600 456 789';
+    document.getElementById('worker').value='Iker';
+    document.getElementById('date').value=d.toISOString().slice(0,10);
+    document.getElementById('time').value='17:30';
+    document.getElementById('service').value='Corte + barba';
+    updatePreview();
+  });
+  window.appDelete=function(id){if(confirm('¿Eliminar esta cita?')){appointments=appointments.filter(function(a){return a.id!==id;});save();render();}};
+  window.appMark=function(id,s){appointments.forEach(function(a){if(a.id===id)a.status=s;});save();render();};
+  window.appEdit=function(id){
+    var a=appointments.find(function(x){return x.id===id;}); if(!a)return;
+    editingId=id;
+    ['client','phone','worker','date','time','service','reminder','channel'].forEach(function(k){document.getElementById(k).value=a[k]||'';});
+    updatePreview(); window.scrollTo({top:0,behavior:'smooth'});
+  };
+  window.appSend=function(id){
+    var a=appointments.find(function(x){return x.id===id;}); if(!a)return;
+    var p=cleanPhone(a.phone);
+    if(p.length===9)p='34'+p;
+    window.open('https://wa.me/'+p+'?text='+encodeURIComponent(message(a)),'_blank');
+  };
+  function setDefaultDate(){
+    var d=new Date(); d.setDate(d.getDate()+1);
+    document.getElementById('date').value=d.toISOString().slice(0,10);
+    document.getElementById('time').value='18:00';
+  }
+  load();setDefaultDate();updatePreview();render();
+})();
+</script>
+</body>
+</html>
