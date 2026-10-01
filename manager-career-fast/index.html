@@ -2027,6 +2027,156 @@ loadDB=async function(){
   };
 })();
 
+
+// ===== CLUB DNA 10.1 =====
+// Lightweight club identity: calculated locally, no new data downloads.
+(function(){
+  const style=document.createElement('style');
+  style.textContent=
+    '.club-dna-v101{margin-top:14px;border-left:3px solid var(--accent)}'+
+    '.dna-tags-v101{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}'+
+    '.dna-tag-v101{padding:4px 7px;border-radius:999px;background:#13251a;border:1px solid #294235;font-size:10px;font-weight:800}'+
+    '.dna-fit-v101{font-size:11px;color:var(--muted)}'+
+    '.dna-good-v101{color:#8ee8a8;font-weight:850}';
+  document.head.appendChild(style);
+
+  const SPECIAL_DNA_V101={
+    'Athletic Club':{name:'Cantera y arraigo',tags:['Cantera','Identidad local','Intensidad'],mentality:'Presión alta',academy:3,youth:2,star:0,text:'La directiva valora especialmente la cantera, la continuidad y un equipo intenso.'},
+    'FC Barcelona':{name:'Cantera y control',tags:['Cantera','Posesión','Técnica'],mentality:'Equilibrada',academy:3,youth:2,star:1,text:'Se espera protagonismo con balón y espacio real para jugadores jóvenes.'},
+    'Real Madrid':{name:'Ganar siempre',tags:['Títulos','Estrellas','Ataque'],mentality:'Ofensiva',academy:1,youth:1,star:3,text:'La exigencia gira alrededor de ganar títulos y contar con futbolistas diferenciales.'},
+    'Atlético Madrid':{name:'Competir cada duelo',tags:['Intensidad','Orden','Carácter'],mentality:'Defensiva',academy:1,youth:1,star:1,text:'La directiva premia equipos competitivos, sólidos y difíciles de superar.'},
+    'Real Sociedad':{name:'Cantera y técnica',tags:['Cantera','Técnica','Desarrollo'],mentality:'Equilibrada',academy:3,youth:2,star:0,text:'Formar talento y competir con una base joven encaja con la identidad del club.'},
+    'Villarreal CF':{name:'Desarrollo inteligente',tags:['Desarrollo','Técnica','Mercado'],mentality:'Equilibrada',academy:2,youth:3,star:0,text:'Se valora desarrollar talento y construir una plantilla competitiva con buen mercado.'},
+    'Arsenal FC':{name:'Juventud y juego',tags:['Jóvenes','Posesión','Ataque'],mentality:'Ofensiva',academy:2,youth:3,star:1,text:'El proyecto premia talento joven, fútbol ofensivo y crecimiento a medio plazo.'},
+    'Liverpool':{name:'Ritmo e intensidad',tags:['Presión','Ritmo','Ataque'],mentality:'Presión alta',academy:1,youth:2,star:2,text:'Se espera un equipo agresivo sin balón y vertical cuando recupera.'},
+    'Manchester City':{name:'Control total',tags:['Posesión','Técnica','Títulos'],mentality:'Equilibrada',academy:1,youth:1,star:3,text:'La plantilla debe dominar partidos, acumular talento y competir por todo.'},
+    'Manchester United':{name:'Grandeza y protagonismo',tags:['Tradición','Estrellas','Ataque'],mentality:'Ofensiva',academy:2,youth:1,star:3,text:'La afición espera jugadores importantes, protagonismo y regreso constante a los títulos.'},
+    'Chelsea FC':{name:'Plantilla de élite',tags:['Mercado','Talento','Títulos'],mentality:'Ofensiva',academy:1,youth:2,star:3,text:'El club acepta un mercado activo, pero exige rendimiento y una plantilla profunda.'},
+    'FC Bayern München':{name:'Dominio doméstico',tags:['Títulos','Jerarquía','Ataque'],mentality:'Ofensiva',academy:1,youth:1,star:3,text:'Ganar la liga es la base; en Europa se espera competir entre los mejores.'},
+    'Borussia Dortmund':{name:'Talento joven',tags:['Jóvenes','Desarrollo','Ataque'],mentality:'Ofensiva',academy:2,youth:3,star:1,text:'Captar, desarrollar y hacer crecer talento joven forma parte del proyecto.'},
+    'Bayer 04 Leverkusen':{name:'Fútbol dinámico',tags:['Técnica','Jóvenes','Ataque'],mentality:'Ofensiva',academy:1,youth:2,star:1,text:'La directiva valora dinamismo, desarrollo y una propuesta ofensiva.'},
+    'Inter Milan':{name:'Orden y ambición',tags:['Títulos','Orden','Experiencia'],mentality:'Defensiva',academy:1,youth:0,star:2,text:'Competir por títulos con una estructura sólida pesa más que el desarrollo a largo plazo.'},
+    'AC Milan':{name:'Tradición europea',tags:['Historia','Talento','Títulos'],mentality:'Equilibrada',academy:1,youth:1,star:2,text:'La exigencia combina resultados, jugadores de nivel y presencia europea.'},
+    'Juventus':{name:'Mentalidad ganadora',tags:['Títulos','Orden','Jerarquía'],mentality:'Defensiva',academy:1,youth:0,star:2,text:'La prioridad es volver a ganar de forma constante y mantener una plantilla de jerarquía.'},
+    'Napoli':{name:'Ataque y carácter',tags:['Ataque','Técnica','Afición'],mentality:'Ofensiva',academy:1,youth:1,star:2,text:'El entorno responde especialmente a un equipo valiente y ofensivo.'},
+    'Paris Saint-Germain':{name:'Superestrellas y títulos',tags:['Estrellas','Ataque','Europa'],mentality:'Ofensiva',academy:0,youth:0,star:3,text:'La plantilla está pensada para ganar inmediatamente y competir por el máximo nivel europeo.'},
+    'Ajax':{name:'Academia y balón',tags:['Cantera','Posesión','Jóvenes'],mentality:'Equilibrada',academy:3,youth:3,star:0,text:'La cantera y el desarrollo técnico de jóvenes forman el centro del proyecto.'},
+    'PSV':{name:'Desarrollo ofensivo',tags:['Jóvenes','Ataque','Desarrollo'],mentality:'Ofensiva',academy:2,youth:3,star:1,text:'Crecer talento y jugar con iniciativa encaja con la filosofía del club.'},
+    'SL Benfica':{name:'Formar para competir',tags:['Cantera','Mercado','Títulos'],mentality:'Ofensiva',academy:3,youth:3,star:1,text:'El club quiere títulos sin renunciar a desarrollar jugadores con gran potencial.'},
+    'Sporting CP':{name:'Academia de élite',tags:['Cantera','Jóvenes','Técnica'],mentality:'Equilibrada',academy:3,youth:3,star:0,text:'La promoción de talento propio tiene un peso especial en las decisiones deportivas.'},
+    'FC Porto':{name:'Competir y revalorizar',tags:['Títulos','Mercado','Intensidad'],mentality:'Presión alta',academy:2,youth:3,star:1,text:'Se espera competir por títulos y convertir talento en rendimiento y valor de mercado.'},
+    'Celtic':{name:'Dominio e intensidad',tags:['Títulos','Afición','Ataque'],mentality:'Ofensiva',academy:1,youth:1,star:2,text:'La exigencia doméstica es máxima y la afición espera una propuesta dominante.'},
+    'Rangers':{name:'Competir por todo',tags:['Títulos','Afición','Intensidad'],mentality:'Presión alta',academy:1,youth:1,star:2,text:'La presión por ganar es alta y se valora un equipo intenso y competitivo.'},
+    'Galatasaray SK':{name:'Presión y estrellas',tags:['Afición','Estrellas','Títulos'],mentality:'Ofensiva',academy:0,youth:0,star:2,text:'La afición exige resultados inmediatos, personalidad y futbolistas decisivos.'},
+    'Fenerbahçe SK':{name:'Ambición total',tags:['Afición','Títulos','Ataque'],mentality:'Ofensiva',academy:0,youth:0,star:2,text:'Cada temporada se vive con obligación de competir por el título.'}
+  };
+
+  function avgSquadV101(club){
+    const ps=getClubPlayers(club);
+    if(!ps.length)return{age:26,potGap:2,rating:clubRating(club)};
+    return{
+      age:ps.reduce((a,p)=>a+(p.age||26),0)/ps.length,
+      potGap:ps.reduce((a,p)=>a+Math.max(0,(p.potential||p.overall)-(p.overall||0)),0)/ps.length,
+      rating:clubRating(club)
+    };
+  }
+
+  function clubDNAV101(club){
+    if(SPECIAL_DNA_V101[club])return SPECIAL_DNA_V101[club];
+    const q=avgSquadV101(club),h=hashV7(club||'club');
+    if(q.age<24.5||q.potGap>4.2)return{name:'Desarrollo de talento',tags:['Jóvenes','Desarrollo','Mercado'],mentality:(h%2?'Ofensiva':'Equilibrada'),academy:2,youth:3,star:0,text:'La directiva valora hacer crecer jugadores y aumentar el valor de la plantilla.'};
+    if(q.rating>=79)return{name:'Ambición de títulos',tags:['Resultados','Jerarquía','Europa'],mentality:(h%3===0?'Presión alta':'Ofensiva'),academy:1,youth:1,star:3,text:'El margen de paciencia es menor: se esperan resultados y jugadores preparados para rendir ya.'};
+    if(q.rating>=72)return{name:'Proyecto competitivo',tags:['Equilibrio','Progreso','Mercado'],mentality:(h%2?'Equilibrada':'Presión alta'),academy:1,youth:2,star:1,text:'El objetivo es crecer sin perder competitividad y mejorar la plantilla con decisiones eficientes.'};
+    return{name:'Construir y crecer',tags:['Desarrollo','Cantera','Estabilidad'],mentality:'Equilibrada',academy:2,youth:2,star:0,text:'El club prioriza estabilidad, desarrollo y crecimiento progresivo de la plantilla.'};
+  }
+  window.clubDNAV101=clubDNAV101;
+
+  function dnaHTMLV101(){
+    const d=clubDNAV101(S.club);
+    const aligned=S.mentality===d.mentality;
+    return '<div class="card club-dna-v101"><div class="row"><h3 style="margin:0">ADN del club</h3><span class="spacer"></span><span class="badge">'+esc(d.name)+'</span></div>'+
+      '<div class="dna-tags-v101">'+d.tags.map(x=>'<span class="dna-tag-v101">'+esc(x)+'</span>').join('')+'</div>'+
+      '<div class="muted">'+esc(d.text)+'</div>'+
+      '<div class="dna-fit-v101" style="margin-top:8px">Estilo recomendado: <strong>'+esc(d.mentality)+'</strong> · <span class="'+(aligned?'dna-good-v101':'')+'">'+(aligned?'Tu táctica encaja':'Tu táctica actual es '+esc(S.mentality))+'</span></div></div>';
+  }
+
+  const renderHomeV101Base=renderHome;
+  renderHome=function(){
+    renderHomeV101Base();
+    const holder=document.createElement('div');
+    holder.innerHTML=dnaHTMLV101();
+    const firstGrid=els.view.querySelector('.grid3');
+    if(firstGrid)firstGrid.insertAdjacentElement('afterend',holder.firstElementChild);
+    else els.view.appendChild(holder.firstElementChild);
+  };
+
+  const renderTacticsV101Base=renderTactics;
+  renderTactics=function(){
+    renderTacticsV101Base();
+    const d=clubDNAV101(S.club);
+    const note=document.createElement('div');
+    note.className='muted';
+    note.style.margin='8px 0 0';
+    note.innerHTML='ADN '+esc(S.club)+': <strong>'+esc(d.name)+'</strong> · estilo recomendado <strong>'+esc(d.mentality)+'</strong>.';
+    const pitch=els.view.querySelector('.pitch');
+    if(pitch)pitch.insertAdjacentElement('beforebegin',note);
+  };
+
+  const teamPowerV101Base=teamPower;
+  teamPower=function(ids){
+    let base=teamPowerV101Base(ids);
+    const sameXI=Array.isArray(ids)&&ids.length===S.lineup.length&&ids.every((id,i)=>id===S.lineup[i]);
+    if(sameXI&&S.mentality===clubDNAV101(S.club).mentality)base+=0.35;
+    return base;
+  };
+
+  const promoteYouthV101Base=promoteYouth;
+  promoteYouth=function(id){
+    const before=new Set(S.players.map(p=>String(p.id)));
+    const d=clubDNAV101(S.club);
+    promoteYouthV101Base(id);
+    const p=S.players.find(x=>!before.has(String(x.id))&&x.club===S.club);
+    if(p&&d.academy>0){
+      const gain=d.academy>=3?2:d.academy>=2?1:0.5;
+      S.board=clamp(S.board+gain,0,100);
+      S.fans=clamp((S.fans||50)+Math.max(0.5,gain/2),0,100);
+      addNews('La cantera encaja con el proyecto',p.name+' refuerza la identidad de '+S.club+'.','cantera');
+      save();
+    }
+  };
+
+  function reactSigningV101(p){
+    if(!p||p.club!==S.club)return;
+    const d=clubDNAV101(S.club);
+    let gain=0,reason='';
+    if(p.age<=23&&d.youth>=2){gain+=d.youth>=3?1.5:.75;reason='talento joven'}
+    if(p.overall>=82&&d.star>=2){gain+=d.star>=3?1.5:.75;reason=reason?reason+' y nivel estrella':'nivel estrella'}
+    if(gain>0){
+      S.board=clamp(S.board+gain,0,100);
+      addNews('Fichaje alineado con el ADN',p.name+' encaja en la idea del club por '+reason+'.','club');
+      save();
+    }
+  }
+
+  const negotiationV101Base=openTransferNegotiation;
+  openTransferNegotiation=function(id){
+    const target=S.players.find(x=>String(x.id)===String(id));
+    const wasClub=target?.club;
+    negotiationV101Base(id);
+    const btn=els.matchBox.querySelector('#sendNeg');
+    if(!btn||!target)return;
+    const oldClick=btn.onclick;
+    btn.onclick=function(e){
+      const beforeClub=target.club;
+      const beforeTransfers=(S.transfers||[]).length;
+      if(typeof oldClick==='function')oldClick.call(this,e);
+      setTimeout(()=>{
+        if(beforeClub!==S.club&&target.club===S.club&&(S.transfers||[]).length>beforeTransfers)reactSigningV101(target);
+      },0);
+    };
+  };
+})();
+
 loadDB();
 })();
 </script>
