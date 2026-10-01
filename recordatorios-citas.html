@@ -7,191 +7,148 @@
 <meta name="theme-color" content="#111827">
 <style>
 :root{--bg:#f4f7fb;--card:#fff;--ink:#172033;--muted:#6b7280;--line:#e6eaf0;--accent:#111827;--ok:#0f9f6e;--warn:#d97706;--danger:#dc2626;--soft:#eef2f7}
-*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}
-button,input,select,textarea{font:inherit}button{cursor:pointer}
-.shell{max-width:1180px;margin:0 auto;padding:24px}
-.topbar{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:22px}
-.brand{display:flex;gap:12px;align-items:center}.logo{width:42px;height:42px;border-radius:14px;background:var(--accent);display:grid;place-items:center;color:#fff;font-weight:800}
-.brand h1{margin:0;font-size:21px}.brand p{margin:2px 0 0;color:var(--muted);font-size:13px}
-.badge{padding:8px 11px;border-radius:999px;background:#e9fff6;color:#087451;font-size:12px;font-weight:700}
-.grid{display:grid;grid-template-columns:1.05fr 1.95fr;gap:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:0 8px 30px rgba(15,23,42,.04)}
-.cardpad{padding:20px}.card h2{font-size:17px;margin:0 0 4px}.sub{color:var(--muted);font-size:13px;margin:0 0 18px}
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}.stat{background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px}.stat .n{font-size:25px;font-weight:800}.stat .t{font-size:12px;color:var(--muted);margin-top:3px}
-.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}.field label{font-size:12px;font-weight:700}.field input,.field select,.field textarea{border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff;outline:none}.field input:focus,.field select:focus,.field textarea:focus{border-color:#9ca3af;box-shadow:0 0 0 3px #eef2f7}
-.actions{display:flex;gap:9px;margin-top:15px;flex-wrap:wrap}.btn{border:0;border-radius:12px;padding:11px 14px;font-weight:750}.btn.primary{background:var(--accent);color:#fff}.btn.secondary{background:var(--soft);color:var(--ink)}.btn.danger{background:#fff1f2;color:#b91c1c}.btn.small{padding:8px 10px;font-size:12px}
-.toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}.search{flex:1;border:1px solid var(--line);border-radius:12px;padding:10px 12px}
-.list{display:flex;flex-direction:column;gap:10px}.appt{border:1px solid var(--line);border-radius:16px;padding:14px}.appttop{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.who{font-weight:800}.meta{font-size:13px;color:var(--muted);margin-top:4px;line-height:1.45}.status{font-size:11px;font-weight:800;padding:6px 9px;border-radius:999px;white-space:nowrap}.status.pending{background:#fff7ed;color:#b45309}.status.sent{background:#ecfdf5;color:#047857}.status.cancelled{background:#fef2f2;color:#b91c1c}.status.done{background:#eef2ff;color:#4338ca}
-.rowactions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}.empty{padding:34px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:16px}
-.note{margin-top:18px;padding:14px;border-radius:14px;background:#f8fafc;border:1px solid var(--line);font-size:13px;line-height:1.5}.note strong{display:block;margin-bottom:4px}
-.preview{background:#0f172a;color:#fff;border-radius:14px;padding:14px;font-size:13px;line-height:1.5;min-height:90px;white-space:pre-wrap}
-.footer{color:var(--muted);font-size:12px;text-align:center;margin:22px 0 4px}
-@media(max-width:840px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:1fr 1fr 1fr}.shell{padding:14px}.topbar{align-items:flex-start}.formgrid{grid-template-columns:1fr}.field.full{grid-column:auto}}
-@media(max-width:520px){.stats{grid-template-columns:1fr}.appttop{flex-direction:column}.badge{display:none}}
+*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink)}button,input,select{font:inherit}button{cursor:pointer}
+.shell{max-width:1180px;margin:auto;padding:24px}.topbar{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:22px}.brand{display:flex;gap:12px;align-items:center}.logo{width:42px;height:42px;border-radius:14px;background:var(--accent);display:grid;place-items:center;color:#fff;font-weight:800}.brand h1{margin:0;font-size:21px}.brand p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.badge{padding:8px 11px;border-radius:999px;background:#e9fff6;color:#087451;font-size:12px;font-weight:700}.card{background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:0 8px 30px rgba(15,23,42,.04)}.cardpad{padding:20px}.grid{display:grid;grid-template-columns:1.05fr 1.95fr;gap:18px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}.stat{background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px}.stat .n{font-size:25px;font-weight:800}.stat .t{font-size:12px;color:var(--muted);margin-top:3px}
+h2{font-size:17px;margin:0 0 4px}.sub{color:var(--muted);font-size:13px;margin:0 0 18px}.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}.field label{font-size:12px;font-weight:700}.field input,.field select{border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:#fff;outline:none}.actions{display:flex;gap:9px;margin-top:15px;flex-wrap:wrap}.btn{border:0;border-radius:12px;padding:11px 14px;font-weight:750}.btn.primary{background:var(--accent);color:#fff}.btn.secondary{background:var(--soft)}.btn.danger{background:#fff1f2;color:#b91c1c}.btn.small{padding:8px 10px;font-size:12px}
+.toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}.search{flex:1;border:1px solid var(--line);border-radius:12px;padding:10px 12px;max-width:220px}.list{display:flex;flex-direction:column;gap:10px}.appt{border:1px solid var(--line);border-radius:16px;padding:14px}.appttop{display:flex;justify-content:space-between;gap:12px}.who{font-weight:800}.meta{font-size:13px;color:var(--muted);margin-top:4px;line-height:1.45}.status{font-size:11px;font-weight:800;padding:6px 9px;border-radius:999px;white-space:nowrap}.pending,.waiting_provider{background:#fff7ed;color:#b45309}.sent{background:#ecfdf5;color:#047857}.failed,.cancelled{background:#fef2f2;color:#b91c1c}.processing{background:#eef2ff;color:#4338ca}.rowactions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}.empty{padding:34px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:16px}.note{margin-top:18px;padding:14px;border-radius:14px;background:#f8fafc;border:1px solid var(--line);font-size:13px;line-height:1.5}.preview{background:#0f172a;color:#fff;border-radius:14px;padding:14px;font-size:13px;line-height:1.5;min-height:90px;white-space:pre-wrap}.auth{max-width:460px;margin:50px auto}.hidden{display:none!important}.toast{position:fixed;right:18px;bottom:18px;background:#111827;color:#fff;padding:12px 14px;border-radius:12px;display:none;max-width:320px}.settings{margin-top:18px}.footer{text-align:center;color:var(--muted);font-size:12px;margin:22px 0}
+@media(max-width:840px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:1fr}.formgrid{grid-template-columns:1fr}.field.full{grid-column:auto}.shell{padding:14px}}
 </style>
 </head>
 <body>
 <div class="shell">
-  <div class="topbar">
-    <div class="brand">
-      <div class="logo">RC</div>
-      <div><h1>Recordatorios de citas</h1><p>Panel sencillo para negocios con cita previa</p></div>
+  <div id="authView" class="card cardpad auth">
+    <h2>Acceso del negocio</h2>
+    <p class="sub">Tus citas se guardan en la nube y solo las ve tu cuenta.</p>
+    <div class="field"><label>Email</label><input id="authEmail" type="email" placeholder="tu@email.com"></div>
+    <div class="field" style="margin-top:10px"><label>Contraseña</label><input id="authPass" type="password" placeholder="Mínimo 6 caracteres"></div>
+    <div class="actions"><button class="btn primary" id="loginBtn">Entrar</button><button class="btn secondary" id="signupBtn">Crear cuenta</button></div>
+    <div class="note"><strong>Primera vez:</strong> pulsa “Crear cuenta”. Si te pide confirmar el email, revisa tu correo y vuelve a entrar.</div>
+  </div>
+
+  <div id="appView" class="hidden">
+    <div class="topbar">
+      <div class="brand"><div class="logo">RC</div><div><h1>Recordatorios de citas</h1><p id="businessLabel">Panel del negocio</p></div></div>
+      <div><span class="badge">Nube conectada</span> <button class="btn secondary small" id="logoutBtn">Salir</button></div>
     </div>
-    <div class="badge">Demo funcional</div>
-  </div>
 
-  <div class="stats">
-    <div class="stat"><div class="n" id="statToday">0</div><div class="t">Citas hoy</div></div>
-    <div class="stat"><div class="n" id="statTomorrow">0</div><div class="t">Citas mañana</div></div>
-    <div class="stat"><div class="n" id="statPending">0</div><div class="t">Recordatorios pendientes</div></div>
-  </div>
+    <div class="stats">
+      <div class="stat"><div class="n" id="statToday">0</div><div class="t">Citas hoy</div></div>
+      <div class="stat"><div class="n" id="statTomorrow">0</div><div class="t">Citas mañana</div></div>
+      <div class="stat"><div class="n" id="statPending">0</div><div class="t">Recordatorios pendientes</div></div>
+    </div>
 
-  <div class="grid">
-    <div>
-      <div class="card cardpad">
-        <h2>Nueva cita</h2>
-        <p class="sub">El negocio mete la cita y el sistema prepara el recordatorio.</p>
-        <form id="apptForm">
-          <div class="formgrid">
-            <div class="field full"><label>Nombre del cliente</label><input id="client" required placeholder="Ej. Andeka"></div>
-            <div class="field"><label>Teléfono</label><input id="phone" required placeholder="Ej. 607 775 804"></div>
-            <div class="field"><label>Trabajador</label><input id="worker" placeholder="Ej. Iker"></div>
-            <div class="field"><label>Fecha</label><input id="date" type="date" required></div>
-            <div class="field"><label>Hora</label><input id="time" type="time" required></div>
-            <div class="field full"><label>Servicio</label><input id="service" placeholder="Ej. Corte + barba"></div>
-            <div class="field"><label>Recordar</label><select id="reminder"><option value="24">24 h antes</option><option value="2">2 h antes</option><option value="48">48 h antes</option></select></div>
-            <div class="field"><label>Canal</label><select id="channel"><option>WhatsApp</option><option>SMS</option><option>Email</option></select></div>
+    <div class="grid">
+      <div>
+        <div class="card cardpad">
+          <h2>Nueva cita</h2><p class="sub">El negocio mete la cita y queda programada en la nube.</p>
+          <form id="apptForm">
+            <div class="formgrid">
+              <div class="field full"><label>Cliente</label><input id="client" required></div>
+              <div class="field"><label>Teléfono</label><input id="phone" required placeholder="607 775 804"></div>
+              <div class="field"><label>Trabajador</label><input id="worker"></div>
+              <div class="field"><label>Fecha</label><input id="date" type="date" required></div>
+              <div class="field"><label>Hora</label><input id="time" type="time" required></div>
+              <div class="field full"><label>Servicio</label><input id="service" placeholder="Corte + barba"></div>
+              <div class="field"><label>Recordar</label><select id="reminder"><option value="24">24 h antes</option><option value="2">2 h antes</option><option value="48">48 h antes</option></select></div>
+              <div class="field"><label>Canal</label><select id="channel"><option value="whatsapp">WhatsApp</option><option value="sms">SMS</option><option value="email">Email</option></select></div>
+            </div>
+            <div class="actions"><button class="btn primary" type="submit">Guardar cita</button><button class="btn secondary" type="button" id="demoBtn">Cargar ejemplo</button></div>
+          </form>
+        </div>
+
+        <div class="card cardpad settings">
+          <h2>Conectar WhatsApp Business</h2>
+          <p class="sub">El token se guarda cifrado en Supabase Vault, no en la web.</p>
+          <div class="field"><label>Nombre del negocio</label><input id="bizName" placeholder="Barbería Norte"></div>
+          <div class="field" style="margin-top:10px"><label>Phone Number ID de Meta</label><input id="waPhoneId" placeholder="123456789..."></div>
+          <div class="field" style="margin-top:10px"><label>Access Token de Meta</label><input id="waToken" type="password" placeholder="EAA..."></div>
+          <div class="formgrid" style="margin-top:10px">
+            <div class="field"><label>Plantilla</label><input id="waTemplate" value="appointment_reminder"></div>
+            <div class="field"><label>Idioma</label><input id="waLang" value="es"></div>
           </div>
-          <div class="actions">
-            <button class="btn primary" type="submit">Guardar cita</button>
-            <button class="btn secondary" type="button" id="demoBtn">Cargar ejemplo</button>
-          </div>
-        </form>
-      </div>
+          <div class="actions"><button class="btn primary" id="saveWaBtn">Guardar configuración</button></div>
+          <div class="note" id="waState">WhatsApp todavía no está conectado.</div>
+        </div>
 
-      <div class="card cardpad" style="margin-top:18px">
-        <h2>Mensaje</h2>
-        <p class="sub">Vista previa de lo que recibirá el cliente.</p>
-        <div class="preview" id="preview"></div>
-        <div class="note">
-          <strong>Automatización real</strong>
-          Esta demo guarda las citas y prepara el mensaje. Para que WhatsApp o SMS se envíen solos aunque el navegador esté cerrado, conectaremos un servicio oficial de mensajería en el siguiente paso.
+        <div class="card cardpad" style="margin-top:18px">
+          <h2>Mensaje</h2><p class="sub">Ejemplo del recordatorio.</p><div class="preview" id="preview"></div>
         </div>
       </div>
-    </div>
 
-    <div class="card cardpad">
-      <div class="toolbar">
-        <div><h2>Citas</h2><p class="sub" style="margin:3px 0 0">Próximas citas y estado del recordatorio</p></div>
-        <input class="search" id="search" placeholder="Buscar cliente..." style="max-width:220px">
+      <div class="card cardpad">
+        <div class="toolbar"><div><h2>Citas</h2><p class="sub" style="margin:3px 0 0">Guardadas en Supabase</p></div><input class="search" id="search" placeholder="Buscar cliente..."></div>
+        <div class="list" id="list"></div>
       </div>
-      <div class="list" id="list"></div>
     </div>
+    <div class="footer">Backend con Supabase + RLS. Datos y credenciales protegidos.</div>
   </div>
-  <div class="footer">Los datos de esta demo se guardan únicamente en este navegador.</div>
 </div>
+<div class="toast" id="toast"></div>
 
-<script>
-(function(){
-  var KEY='recordatorios_citas_v1';
-  var appointments=[];
-  var editingId=null;
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+const SUPABASE_URL='https://rzbwbilscgeeprflviwf.supabase.co';
+const SUPABASE_KEY='sb_publishable_m-Z2NAiEYucjQhOJ2N5Wvw_7RqrtmCu';
+const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
+let business=null,appointments=[],editingId=null;
+const $=id=>document.getElementById(id);
 
-  function load(){
-    try{appointments=JSON.parse(localStorage.getItem(KEY)||'[]');}catch(e){appointments=[];}
-    if(!appointments.length){
-      var d=new Date(); d.setDate(d.getDate()+1);
-      var iso=d.toISOString().slice(0,10);
-      appointments=[{id:Date.now(),client:'Cliente de ejemplo',phone:'600123123',worker:'Iker',date:iso,time:'18:00',service:'Corte',reminder:'24',channel:'WhatsApp',status:'pending'}];
-      save();
-    }
-  }
-  function save(){localStorage.setItem(KEY,JSON.stringify(appointments));}
-  function esc(s){return String(s||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
-  function cleanPhone(p){return String(p||'').replace(/\D/g,'').replace(/^00/,'');}
-  function dt(a){return new Date(a.date+'T'+a.time+':00');}
-  function fmtDate(a){
-    var d=dt(a);
-    return d.toLocaleDateString('es-ES',{weekday:'short',day:'2-digit',month:'short'})+' · '+a.time;
-  }
-  function message(a){
-    var service=a.service?' para '+a.service:'';
-    var worker=a.worker?' con '+a.worker:'';
-    return 'Hola '+a.client+' 👋\\nTe recordamos que tienes una cita mañana a las '+a.time+service+worker+'.\\nSi no puedes venir, avísanos con tiempo. ¡Gracias!';
-  }
-  function statusText(s){return s==='sent'?'Enviado':s==='cancelled'?'Cancelada':s==='done'?'Realizada':'Pendiente';}
-  function sameDay(a,b){return a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();}
-  function renderStats(){
-    var now=new Date(), tom=new Date(); tom.setDate(now.getDate()+1);
-    document.getElementById('statToday').textContent=appointments.filter(function(a){return sameDay(dt(a),now)&&a.status!=='cancelled';}).length;
-    document.getElementById('statTomorrow').textContent=appointments.filter(function(a){return sameDay(dt(a),tom)&&a.status!=='cancelled';}).length;
-    document.getElementById('statPending').textContent=appointments.filter(function(a){return a.status==='pending';}).length;
-  }
-  function render(){
-    var q=document.getElementById('search').value.trim().toLowerCase();
-    var list=document.getElementById('list');
-    var rows=appointments.slice().sort(function(a,b){return dt(a)-dt(b);}).filter(function(a){
-      return !q || (a.client+' '+a.phone+' '+a.service+' '+a.worker).toLowerCase().indexOf(q)>=0;
-    });
-    if(!rows.length){list.innerHTML='<div class="empty">No hay citas que mostrar.</div>'; renderStats(); return;}
-    list.innerHTML=rows.map(function(a){
-      return '<div class="appt">'+
-        '<div class="appttop"><div><div class="who">'+esc(a.client)+'</div>'+
-        '<div class="meta">'+esc(fmtDate(a))+(a.service?' · '+esc(a.service):'')+(a.worker?' · '+esc(a.worker):'')+'<br>'+esc(a.phone)+' · '+esc(a.channel)+' · '+esc(a.reminder)+' h antes</div></div>'+
-        '<span class="status '+esc(a.status)+'">'+statusText(a.status)+'</span></div>'+
-        '<div class="rowactions">'+
-          '<button class="btn secondary small" onclick="appSend('+a.id+')">Enviar WhatsApp</button>'+
-          '<button class="btn secondary small" onclick="appMark('+a.id+',\\'sent\\')">Marcar enviado</button>'+
-          '<button class="btn secondary small" onclick="appEdit('+a.id+')">Editar</button>'+
-          '<button class="btn danger small" onclick="appDelete('+a.id+')">Eliminar</button>'+
-        '</div></div>';
-    }).join('');
-    renderStats();
-  }
-  function updatePreview(){
-    var a={client:document.getElementById('client').value||'Andeka',time:document.getElementById('time').value||'18:00',service:document.getElementById('service').value,worker:document.getElementById('worker').value};
-    document.getElementById('preview').textContent=message(a);
-  }
-  document.getElementById('apptForm').addEventListener('submit',function(e){
-    e.preventDefault();
-    var obj={id:editingId||Date.now(),client:document.getElementById('client').value.trim(),phone:document.getElementById('phone').value.trim(),worker:document.getElementById('worker').value.trim(),date:document.getElementById('date').value,time:document.getElementById('time').value,service:document.getElementById('service').value.trim(),reminder:document.getElementById('reminder').value,channel:document.getElementById('channel').value,status:'pending'};
-    if(editingId){
-      appointments=appointments.map(function(a){if(a.id===editingId){obj.status=a.status;}return a.id===editingId?obj:a;});
-    }else appointments.push(obj);
-    editingId=null; save(); this.reset(); setDefaultDate(); updatePreview(); render();
-  });
-  document.getElementById('search').addEventListener('input',render);
-  ['client','time','service','worker'].forEach(function(id){document.getElementById(id).addEventListener('input',updatePreview);});
-  document.getElementById('demoBtn').addEventListener('click',function(){
-    var d=new Date(); d.setDate(d.getDate()+2);
-    document.getElementById('client').value='Mikel';
-    document.getElementById('phone').value='600 456 789';
-    document.getElementById('worker').value='Iker';
-    document.getElementById('date').value=d.toISOString().slice(0,10);
-    document.getElementById('time').value='17:30';
-    document.getElementById('service').value='Corte + barba';
-    updatePreview();
-  });
-  window.appDelete=function(id){if(confirm('¿Eliminar esta cita?')){appointments=appointments.filter(function(a){return a.id!==id;});save();render();}};
-  window.appMark=function(id,s){appointments.forEach(function(a){if(a.id===id)a.status=s;});save();render();};
-  window.appEdit=function(id){
-    var a=appointments.find(function(x){return x.id===id;}); if(!a)return;
-    editingId=id;
-    ['client','phone','worker','date','time','service','reminder','channel'].forEach(function(k){document.getElementById(k).value=a[k]||'';});
-    updatePreview(); window.scrollTo({top:0,behavior:'smooth'});
-  };
-  window.appSend=function(id){
-    var a=appointments.find(function(x){return x.id===id;}); if(!a)return;
-    var p=cleanPhone(a.phone);
-    if(p.length===9)p='34'+p;
-    window.open('https://wa.me/'+p+'?text='+encodeURIComponent(message(a)),'_blank');
-  };
-  function setDefaultDate(){
-    var d=new Date(); d.setDate(d.getDate()+1);
-    document.getElementById('date').value=d.toISOString().slice(0,10);
-    document.getElementById('time').value='18:00';
-  }
-  load();setDefaultDate();updatePreview();render();
-})();
+function toast(msg){$('toast').textContent=msg;$('toast').style.display='block';setTimeout(function(){$('toast').style.display='none'},2800)}
+function setDefaultDate(){const d=new Date();d.setDate(d.getDate()+1);$('date').value=d.toISOString().slice(0,10);$('time').value='18:00'}
+function message(){
+  let s='Hola '+($('client').value||'Andeka')+' 👋\nTe recordamos que tienes una cita el '+($('date').value||'02/10')+' a las '+($('time').value||'18:00');
+  if($('service').value)s+=' para '+$('service').value;
+  if($('worker').value)s+=' con '+$('worker').value;
+  return s+'.\nSi no puedes venir, avísanos con tiempo. ¡Gracias!';
+}
+function updatePreview(){$('preview').textContent=message()}
+['client','date','time','service','worker'].forEach(function(id){$(id).addEventListener('input',updatePreview)});
+
+async function ensureBusiness(){
+  const one=await sb.rpc('reminder_ensure_business',{p_name:'Mi negocio'});if(one.error)throw one.error;
+  const two=await sb.from('reminder_businesses').select('*').eq('id',one.data).single();if(two.error)throw two.error;
+  business=two.data;$('businessLabel').textContent=business.name;$('bizName').value=business.name||'';$('waPhoneId').value=business.whatsapp_phone_number_id||'';$('waTemplate').value=business.whatsapp_template_name||'appointment_reminder';$('waLang').value=business.whatsapp_template_language||'es';$('waState').textContent=business.whatsapp_configured?'WhatsApp configurado ✅':'WhatsApp todavía no está conectado.';
+}
+async function loadAppointments(){const r=await sb.from('reminder_appointments').select('*').eq('business_id',business.id).order('appointment_at',{ascending:true});if(r.error)throw r.error;appointments=r.data||[];render()}
+function dt(a){return new Date(a.appointment_at)}
+function fmt(a){return dt(a).toLocaleString('es-ES',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}
+function statusText(s){return ({pending:'Pendiente',processing:'Procesando',sent:'Enviado',failed:'Error',cancelled:'Cancelada',waiting_provider:'Esperando WhatsApp'})[s]||s}
+function esc(s){return String(s||'').replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function render(){
+  const q=$('search').value.trim().toLowerCase();const rows=appointments.filter(function(a){return !q||(a.client_name+' '+a.phone+' '+(a.service||'')+' '+(a.worker||'')).toLowerCase().includes(q)});
+  if(!rows.length){$('list').innerHTML='<div class="empty">No hay citas.</div>'}
+  else {$('list').innerHTML=rows.map(function(a){
+    return '<div class="appt"><div class="appttop"><div><div class="who">'+esc(a.client_name)+'</div><div class="meta">'+esc(fmt(a))+(a.service?' · '+esc(a.service):'')+(a.worker?' · '+esc(a.worker):'')+'<br>'+esc(a.phone)+' · '+esc(a.channel)+' · '+a.reminder_hours+' h antes</div></div><span class="status '+esc(a.reminder_status)+'">'+statusText(a.reminder_status)+'</span></div><div class="rowactions"><button class="btn secondary small" onclick="editAppt(\''+a.id+'\')">Editar</button><button class="btn danger small" onclick="deleteAppt(\''+a.id+'\')">Eliminar</button></div></div>'
+  }).join('')}
+  const now=new Date(),tom=new Date();tom.setDate(now.getDate()+1);const same=function(x,y){return x.getFullYear()===y.getFullYear()&&x.getMonth()===y.getMonth()&&x.getDate()===y.getDate()};
+  $('statToday').textContent=appointments.filter(function(a){return same(dt(a),now)&&a.reminder_status!=='cancelled'}).length;
+  $('statTomorrow').textContent=appointments.filter(function(a){return same(dt(a),tom)&&a.reminder_status!=='cancelled'}).length;
+  $('statPending').textContent=appointments.filter(function(a){return ['pending','failed','waiting_provider'].includes(a.reminder_status)}).length;
+}
+$('search').addEventListener('input',render);
+
+$('apptForm').addEventListener('submit',async function(e){
+  e.preventDefault();const when=new Date($('date').value+'T'+$('time').value+':00');const hours=Number($('reminder').value);const reminderAt=new Date(when.getTime()-hours*3600000);
+  const payload={business_id:business.id,client_name:$('client').value.trim(),phone:$('phone').value.trim(),worker:$('worker').value.trim()||null,service:$('service').value.trim()||null,appointment_at:when.toISOString(),reminder_hours:hours,reminder_at:reminderAt.toISOString(),channel:$('channel').value,reminder_status:'pending',sent_at:null,last_error:null,provider_message_id:null};
+  const r=editingId?await sb.from('reminder_appointments').update(payload).eq('id',editingId):await sb.from('reminder_appointments').insert(payload);
+  if(r.error){toast(r.error.message);return}editingId=null;e.target.reset();setDefaultDate();updatePreview();await loadAppointments();toast('Cita guardada');
+});
+window.editAppt=async function(id){const a=appointments.find(function(x){return x.id===id});if(!a)return;editingId=id;$('client').value=a.client_name;$('phone').value=a.phone;$('worker').value=a.worker||'';$('service').value=a.service||'';$('reminder').value=String(a.reminder_hours);$('channel').value=a.channel;const x=new Date(a.appointment_at);$('date').value=x.toISOString().slice(0,10);$('time').value=x.toTimeString().slice(0,5);updatePreview();scrollTo({top:0,behavior:'smooth'})};
+window.deleteAppt=async function(id){if(!confirm('¿Eliminar esta cita?'))return;const r=await sb.from('reminder_appointments').delete().eq('id',id);if(r.error)toast(r.error.message);else{await loadAppointments();toast('Cita eliminada')}};
+$('demoBtn').addEventListener('click',function(){$('client').value='Mikel';$('phone').value='600 456 789';$('worker').value='Iker';$('service').value='Corte + barba';const d=new Date();d.setDate(d.getDate()+2);$('date').value=d.toISOString().slice(0,10);$('time').value='17:30';updatePreview()});
+
+$('saveWaBtn').addEventListener('click',async function(){
+  if($('bizName').value.trim()&&$('bizName').value.trim()!==business.name){const b=await sb.from('reminder_businesses').update({name:$('bizName').value.trim()}).eq('id',business.id);if(b.error){toast(b.error.message);return}}
+  if(!$('waPhoneId').value.trim()||!$('waToken').value.trim()){toast('Faltan Phone Number ID y Access Token');return}
+  const r=await sb.rpc('reminder_set_whatsapp_config',{p_phone_number_id:$('waPhoneId').value.trim(),p_access_token:$('waToken').value.trim(),p_template_name:$('waTemplate').value.trim()||'appointment_reminder',p_template_language:$('waLang').value.trim()||'es'});
+  if(r.error){toast(r.error.message);return}$('waToken').value='';await ensureBusiness();toast('WhatsApp guardado de forma segura');
+});
+async function enter(){const g=await sb.auth.getSession();if(!g.data.session){$('authView').classList.remove('hidden');$('appView').classList.add('hidden');return}$('authView').classList.add('hidden');$('appView').classList.remove('hidden');try{await ensureBusiness();await loadAppointments()}catch(e){toast(e.message)}}
+$('loginBtn').addEventListener('click',async function(){const r=await sb.auth.signInWithPassword({email:$('authEmail').value.trim(),password:$('authPass').value});if(r.error)toast(r.error.message);else enter()});
+$('signupBtn').addEventListener('click',async function(){const r=await sb.auth.signUp({email:$('authEmail').value.trim(),password:$('authPass').value});if(r.error)toast(r.error.message);else toast('Cuenta creada. Si te pide confirmar email, revisa tu correo.')});
+$('logoutBtn').addEventListener('click',async function(){await sb.auth.signOut();location.reload()});
+setDefaultDate();updatePreview();enter();
 </script>
 </body>
 </html>
