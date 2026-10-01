@@ -57,12 +57,65 @@ jobs:
               'bayern munich':'19','inter milan':'31','ac milan':'31'
           }
 
+          # 2026/27: listas cerradas de LALIGA para evitar falsos positivos
+          SPAIN_53 = {
+              'athletic club','athletic bilbao','atletico madrid','club atletico de madrid',
+              'ca osasuna','osasuna','celta','rc celta','rc celta de vigo',
+              'deportivo alaves','elche','elche cf','fc barcelona','barcelona',
+              'getafe','getafe cf','levante','levante ud','malaga','malaga cf',
+              'racing santander','real racing club de santander','r racing club',
+              'rayo vallecano','rc deportivo','rc deportivo a coruna','deportivo la coruna',
+              'rcd espanyol','rcd espanyol de barcelona','espanyol',
+              'real betis','real betis balompie','real madrid','real sociedad',
+              'sevilla','sevilla fc','valencia','valencia cf','villarreal','villarreal cf'
+          }
+          SPAIN_54 = {
+              'ad ceuta','ad ceuta fc','albacete','albacete bp','albacete balompie',
+              'burgos','burgos cf','cadiz','cadiz cf','cd castellon','castellon',
+              'cd eldense','eldense','cd leganes','leganes','cd tenerife','tenerife',
+              'ce sabadell','sabadell','celta fortuna','rc celta fortuna',
+              'cordoba','cordoba cf','fc andorra','andorra','girona','girona fc',
+              'granada','granada cf','real sociedad b','real sociedad de futbol b',
+              'rcd mallorca','mallorca','real oviedo','oviedo',
+              'real sporting','real sporting de gijon','sporting gijon',
+              'real valladolid','real valladolid cf','sd eibar','eibar',
+              'ud almeria','almeria','ud las palmas','las palmas'
+          }
+          SPAIN_CURRENT = {norm(x):'53' for x in SPAIN_53}
+          SPAIN_CURRENT.update({norm(x):'54' for x in SPAIN_54})
+
+          # Falsos positivos conocidos provocados por coincidencias de nombre.
+          WRONG_COUNTRY_CLUBS = {
+              'palmeiras','fc goa','atlante','dc united','northeast united',
+              'atlanta united','rotherham united','york city','sporting cristal'
+          }
+
           def league_for(club):
               n=norm(club)
-              if n in exact: return exact[n]
-              if n in aliases: return aliases[n]
+
+              # Las dos divisiones españolas usan pertenencia real 2026/27,
+              # no similitud con la base antigua.
+              if n in SPAIN_CURRENT:
+                  return SPAIN_CURRENT[n]
+
+              if n in WRONG_COUNTRY_CLUBS:
+                  return ''
+
+              if n in aliases:
+                  return aliases[n]
+
+              if n in exact:
+                  lid=exact[n]
+                  if lid in {'53','54'}:
+                      return ''
+                  return lid
+
               best=(0,None)
               for sn,lid,_ in supported:
+                  # Nunca permitimos que el fuzzy matching invente clubes
+                  # para Primera/Segunda españolas.
+                  if lid in {'53','54'}:
+                      continue
                   if n in sn or sn in n:
                       score=.9*min(len(n),len(sn))/max(len(n),len(sn))
                   else:
@@ -121,3 +174,5 @@ jobs:
           git push
 
 # retrigger 2026-10-01
+
+# enforce official Spain 2026-27 memberships
