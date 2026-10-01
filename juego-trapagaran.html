@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Trapagaran 3D</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#111;font-family:Arial,Helvetica,sans-serif}
+#game{position:fixed;inset:0}
+#hud{position:fixed;top:12px;left:12px;z-index:10;color:white;background:rgba(0,0,0,.55);backdrop-filter:blur(7px);padding:10px 12px;border-radius:12px;font-size:14px;line-height:1.45}
+#status{position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:10;color:white;background:rgba(0,0,0,.55);padding:8px 12px;border-radius:999px;font-size:13px;text-align:center;max-width:80vw}
+#help{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:10;color:white;background:rgba(0,0,0,.55);padding:9px 12px;border-radius:12px;font-size:13px;text-align:center}
+#credit{position:fixed;right:8px;bottom:8px;z-index:10;color:#fff;background:rgba(0,0,0,.45);padding:5px 7px;border-radius:6px;font-size:10px}
+button{font:inherit}
+@media(max-width:700px){#hud{font-size:12px}#help{font-size:11px;bottom:8px;width:85%}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud"><b>Trapagaran 3D</b><br>Zona: Estrada del Molino / centro<br>Velocidad: <span id="speed">0</span> km/h</div>
+<div id="status">Cargando calles y edificios reales de OpenStreetMap…</div>
+<div id="help">WASD / flechas · Shift correr · Espacio saltar · Arrastra con el ratón para girar cámara</div>
+<div id="credit">© OpenStreetMap contributors</div>
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
+
+const container=document.getElementById("game");
+const statusEl=document.getElementById("status");
+const speedEl=document.getElementById("speed");
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:"high-performance"});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.1;
+container.appendChild(renderer.domElement);
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x9fc7df);
+scene.fog=new THREE.FogExp2(0xa8c3d2,.00165);
+
+const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,3500);
+
+const hemi=new THREE.HemisphereLight(0xe7f5ff,0x506145,1.75);
+scene.add(hemi);
+const sun=new THREE.DirectionalLight(0xffe5c2,3.2);
+sun.position.set(-180,260,-100);
+sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);
+sun.shadow.camera.left=-300; sun.shadow.camera.right=300; sun.shadow.camera.top=300; sun.shadow.camera.bottom=-300;
+scene.add(sun);
+
+const ground=new THREE.Mesh(
+  new THREE.PlaneGeometry(2200,2200),
+  new THREE.MeshStandardMaterial({color:0x617e4f,roughness:1})
+);
+ground.rotation.x=-Math.PI/2;
+ground.receiveShadow=true;
+scene.add(ground);
+
+const world=new THREE.Group();
+scene.add(world);
+
+const roadMat=new THREE.MeshStandardMaterial({color:0x303235,roughness:.93});
+const sidewalkMat=new THREE.MeshStandardMaterial({color:0x8b8d88,roughness:1});
+const buildingMats=[
+ new THREE.MeshStandardMaterial({color:0xb08b75,roughness:.88}),
+ new THREE.MeshStandardMaterial({color:0xc1a28d,roughness:.9}),
+ new THREE.MeshStandardMaterial({color:0x9d7c6a,roughness:.9}),
+ new THREE.MeshStandardMaterial({color:0xc1b6a8,roughness:.92}),
+ new THREE.MeshStandardMaterial({color:0x806d63,roughness:.9})
+];
+
+const LAT0=43.3057623, LON0=-3.0372407;
+const DEG_LAT=111320;
+const DEG_LON=111320*Math.cos(LAT0*Math.PI/180);
+function xy(lat,lon){ return new THREE.Vector2((lon-LON0)*DEG_LON, -(lat-LAT0)*DEG_LAT); }
+
+function roadWidth(tags={}){
+ const hw=tags.highway||"";
+ if(hw==="motorway"||hw==="trunk")return 14;
+ if(hw==="primary")return 11;
+ if(hw==="secondary")return 9;
+ if(hw==="tertiary")return 8;
+ if(hw==="residential"||hw==="unclassified")return 6.5;
+ if(hw==="service")return 4.5;
+ if(hw==="footway"||hw==="path"||hw==="pedestrian")return 2.2;
+ return 4;
+}
+function addRoad(geom,tags){
+ if(!geom||geom.length<2)return;
+ const w=roadWidth(tags);
+ for(let i=0;i<geom.length-1;i++){
+   const a=xy(geom[i].lat,geom[i].lon), b=xy(geom[i+1].lat,geom[i+1].lon);
+   const dx=b.x-a.x, dz=b.y-a.y, len=Math.hypot(dx,dz);
+   if(len<.3)continue;
+   const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,.08,len+.5),roadMat);
+   mesh.position.set((a.x+b.x)/2,.045,(a.y+b.y)/2);
+   mesh.rotation.y=Math.atan2(dx,dz);
+   mesh.receiveShadow=true;
+   world.add(mesh);
+   if(w>=6){
+      const sw=new THREE.Mesh(new THREE.BoxGeometry(w+2.2,.055,len+.6),sidewalkMat);
+      sw.position.set((a.x+b.x)/2,.025,(a.y+b.y)/2);
+      sw.rotation.y=mesh.rotation.y;
+      sw.receiveShadow=true;
+      world.add(sw); world.remove(mesh); world.add(sw); world.add(mesh);
+   }
+ }
+}
+function parseHeight(tags={}){
+ if(tags.height){
+   const h=parseFloat(String(tags.height).replace(",","."));
+   if(Number.isFinite(h))return Math.min(Math.max(h,2.8),65);
+ }
+ if(tags["building:levels"]){
+   const n=parseFloat(tags["building:levels"]);
+   if(Number.isFinite(n))return Math.min(Math.max(n*3.05,3),60);
+ }
+ return 6+Math.random()*11;
+}
+function addBuilding(geom,tags){
+ if(!geom||geom.length<4)return;
+ const pts=geom.map(p=>xy(p.lat,p.lon));
+ const shape=new THREE.Shape();
+ shape.moveTo(pts[0].x,-pts[0].y);
+ for(let i=1;i<pts.length;i++)shape.lineTo(pts[i].x,-pts[i].y);
+ const h=parseHeight(tags);
+ const ex=new THREE.ExtrudeGeometry(shape,{depth:h,bevelEnabled:false,steps:1});
+ ex.rotateX(-Math.PI/2);
+ const mat=buildingMats[Math.floor(Math.random()*buildingMats.length)];
+ const m=new THREE.Mesh(ex,mat);
+ m.position.y=.08;
+ m.castShadow=true;m.receiveShadow=true;
+ world.add(m);
+}
+
+function fallbackTown(){
+ for(let z=-380;z<380;z+=90){
+   const r=new THREE.Mesh(new THREE.BoxGeometry(9,.08,760),roadMat);r.position.set(z,.04,0);world.add(r);
+   const r2=new THREE.Mesh(new THREE.BoxGeometry(760,.08,9),roadMat);r2.position.set(0,.04,z);world.add(r2);
+ }
+ for(let x=-330;x<=330;x+=55)for(let z=-330;z<=330;z+=55){
+   if(Math.random()<.25)continue;
+   const h=7+Math.random()*18;
+   const b=new THREE.Mesh(new THREE.BoxGeometry(28+Math.random()*12,h,30+Math.random()*10),buildingMats[Math.floor(Math.random()*buildingMats.length)]);
+   b.position.set(x+(Math.random()-.5)*15,h/2,z+(Math.random()-.5)*15);b.castShadow=true;b.receiveShadow=true;world.add(b);
+ }
+}
+
+async function loadOSM(){
+ try{
+  const q=`[out:json][timeout:28];(way["building"](around:900,${LAT0},${LON0});way["highway"](around:900,${LAT0},${LON0}););out tags geom;`;
+  const url="https://overpass-api.de/api/interpreter?data="+encodeURIComponent(q);
+  const res=await fetch(url);
+  if(!res.ok)throw new Error("HTTP "+res.status);
+  const data=await res.json();
+  let bc=0,rc=0;
+  const roads=[],buildings=[];
+  for(const e of data.elements||[]){
+    if(e.tags?.building){buildings.push(e);bc++}
+    else if(e.tags?.highway){roads.push(e);rc++}
+  }
+  roads.sort((a,b)=>roadWidth(a.tags)-roadWidth(b.tags));
+  roads.forEach(e=>addRoad(e.geometry,e.tags));
+  buildings.slice(0,1400).forEach(e=>addBuilding(e.geometry,e.tags));
+  statusEl.textContent=`Mapa real cargado: ${bc} edificios · ${rc} tramos de calle`;
+  setTimeout(()=>statusEl.style.opacity=".15",4000);
+ }catch(err){
+  console.warn(err); fallbackTown();
+  statusEl.textContent="No se pudo descargar el mapa real; mostrando escenario 3D de respaldo.";
+ }
+}
+loadOSM();
+
+function limb(r=.13,l=.85,color=0x222222){
+ const g=new THREE.CylinderGeometry(r,r*.9,l,8);
+ const m=new THREE.MeshStandardMaterial({color,roughness:.8});
+ const mesh=new THREE.Mesh(g,m);mesh.castShadow=true;return mesh;
+}
+const player=new THREE.Group();
+scene.add(player);
+const torso=new THREE.Mesh(new THREE.CapsuleGeometry(.31,.75,6,10),new THREE.MeshStandardMaterial({color:0x243a74,roughness:.72}));
+torso.position.y=1.42;torso.castShadow=true;player.add(torso);
+const head=new THREE.Mesh(new THREE.SphereGeometry(.24,18,14),new THREE.MeshStandardMaterial({color:0xd3a078,roughness:.82}));
+head.position.y=2.22;head.castShadow=true;player.add(head);
+const hair=new THREE.Mesh(new THREE.SphereGeometry(.245,16,8,0,Math.PI*2,0,Math.PI*.55),new THREE.MeshStandardMaterial({color:0x291c16,roughness:1}));
+hair.position.set(0,2.3,0);hair.castShadow=true;player.add(hair);
+const legL=limb(.12,.86,0x22262b),legR=limb(.12,.86,0x22262b);
+legL.position.set(-.16,.62,0);legR.position.set(.16,.62,0);player.add(legL,legR);
+const armL=limb(.095,.78,0xd3a078),armR=limb(.095,.78,0xd3a078);
+armL.position.set(-.43,1.48,0);armR.position.set(.43,1.48,0);player.add(armL,armR);
+player.position.set(0,0,0);
+
+let camYaw=Math.PI,camPitch=.28,camDist=5.2;
+let drag=false,px=0,py=0;
+renderer.domElement.addEventListener("pointerdown",e=>{drag=true;px=e.clientX;py=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)});
+renderer.domElement.addEventListener("pointermove",e=>{
+ if(!drag)return;
+ camYaw-=(e.clientX-px)*.004; camPitch=Math.max(-.05,Math.min(.75,camPitch+(e.clientY-py)*.003));
+ px=e.clientX;py=e.clientY;
+});
+renderer.domElement.addEventListener("pointerup",()=>drag=false);
+renderer.domElement.addEventListener("wheel",e=>{camDist=Math.max(3.2,Math.min(9,camDist+e.deltaY*.004));},{passive:true});
+
+const keys={};
+addEventListener("keydown",e=>{keys[e.code]=true;if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code))e.preventDefault()});
+addEventListener("keyup",e=>{keys[e.code]=false});
+
+let vy=0,onGround=true,walkT=0;
+const clock=new THREE.Clock();
+
+function animate(){
+ requestAnimationFrame(animate);
+ const dt=Math.min(clock.getDelta(),.035);
+ let f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0);
+ let r=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
+ const run=keys.ShiftLeft||keys.ShiftRight;
+ const speed=run?8.5:4.6;
+ let moving=false;
+ if(f||r){
+   const len=Math.hypot(f,r);f/=len;r/=len;
+   const forward=new THREE.Vector3(-Math.sin(camYaw),0,-Math.cos(camYaw));
+   const right=new THREE.Vector3(-forward.z,0,forward.x);
+   const v=forward.multiplyScalar(f).add(right.multiplyScalar(r)).normalize();
+   player.position.addScaledVector(v,speed*dt);
+   player.rotation.y=Math.atan2(v.x,v.z);
+   moving=true;
+   walkT+=dt*(run?12:8);
+   legL.rotation.x=Math.sin(walkT)*.55;legR.rotation.x=-Math.sin(walkT)*.55;
+   armL.rotation.x=-Math.sin(walkT)*.4;armR.rotation.x=Math.sin(walkT)*.4;
+ } else {
+   legL.rotation.x*=.82;legR.rotation.x*=.82;armL.rotation.x*=.82;armR.rotation.x*=.82;
+ }
+ if(keys.Space&&onGround){vy=6.6;onGround=false}
+ vy-=17.5*dt;player.position.y+=vy*dt;
+ if(player.position.y<0){player.position.y=0;vy=0;onGround=true}
+
+ const target=player.position.clone().add(new THREE.Vector3(0,1.55,0));
+ const horiz=camDist*Math.cos(camPitch);
+ const desired=new THREE.Vector3(
+   target.x+Math.sin(camYaw)*horiz,
+   target.y+Math.sin(camPitch)*camDist+1.0,
+   target.z+Math.cos(camYaw)*horiz
+ );
+ camera.position.lerp(desired,1-Math.pow(.001,dt));
+ camera.lookAt(target);
+ speedEl.textContent=moving?Math.round(speed*3.6):"0";
+ renderer.render(scene,camera);
+}
+animate();
+
+addEventListener("resize",()=>{
+ camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
