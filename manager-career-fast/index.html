@@ -1124,6 +1124,17 @@ loadDB=async function(){
     return fx;
   }
 
+  const teamPowerV92Base=teamPower;
+  teamPower=function(ids){
+    let base=teamPowerV92Base(ids);
+    const sameXI=Array.isArray(ids)&&ids.length===S.lineup.length&&ids.every((id,i)=>id===S.lineup[i]);
+    if(sameXI){
+      const fx=roleImpactV92();
+      base+=fx.attack*.18+fx.control*.16+fx.defense*.14;
+    }
+    return base;
+  };
+
   const renderTacticsV92Base=renderTactics;
   renderTactics=function(){
     renderTacticsV92Base();
