@@ -854,6 +854,91 @@ loadDB = async function(){
   }
 };
 
+
+// ===== V8.2 PATCH: compact FC27 database, reliable startup =====
+const FC27_LITE_URL='https://andekarivera20-cpu.github.io/mi-primera-web/manager-career/data/fc27-lite.json';
+function buildDBFromLiteV82(data){
+  DB={players:[],clubs:new Map(),leagues:new Map()};
+  const rows=Array.isArray(data?.players)?data.players:[];
+  for(const a of rows){
+    const [id,name,full,positions,overall,potential,value,wage,age,club,lid,nation,foot]=a;
+    if(!club||!EURO_LEAGUES[String(lid)]) continue;
+    const p={id:String(id||''),name:name||full||'Jugador',full:full||name||'',positions:positions||'',overall:+overall||50,potential:+potential||(+overall||50),value:+value||0,wage:+wage||0,age:+age||20,club,leagueId:String(lid),leagueName:EURO_LEAGUES[String(lid)]?.name||'',leagueLevel:EURO_LEAGUES[String(lid)]?.tier||1,nation:nation||'',foot:foot||'',fitness:100,morale:70,goals:0,assists:0,cards:0,injuredUntil:null,suspension:0,contractUntil:null,squadRole:'Rotación',dataEdition:'FC27'};
+    DB.players.push(p);
+    if(!DB.clubs.has(club)) DB.clubs.set(club,{name:club,leagueId:String(lid)});
+  }
+  DB.leagues=new Map();
+  for(const [club,o] of DB.clubs){
+    if(!DB.leagues.has(o.leagueId)) DB.leagues.set(o.leagueId,new Set());
+    DB.leagues.get(o.leagueId).add(club);
+  }
+  for(const [lid,set] of [...DB.leagues]){
+    if(set.size<8){
+      DB.leagues.delete(lid);
+      for(const club of set) DB.clubs.delete(club);
+      DB.players=DB.players.filter(p=>p.leagueId!==lid);
+    }
+  }
+  return DB.players.length>500 && DB.clubs.size>20;
+}
+function trySavedFastBootV82(){
+  const raw=localStorage.getItem('managerCareerV5')||localStorage.getItem('managerCareerV4')||localStorage.getItem('managerCareerV3')||localStorage.getItem('managerCareerV2');
+  if(!raw) return false;
+  try{
+    const saved=JSON.parse(raw);
+    if(rebuildDBFromSavedV81(saved)){
+      populateCountries();
+      els.continueBtn.classList.remove('hidden');
+      els.loadBar.style.width='100%';
+      els.loadText.textContent='Partida guardada lista';
+      els.coverage.textContent='Puedes continuar ya. Actualizando datos de temporada en segundo plano.';
+      return true;
+    }
+  }catch(e){console.warn('Arranque guardado',e)}
+  return false;
+}
+async function loadLiteV82(){
+  const ctl=new AbortController();
+  const timer=setTimeout(()=>ctl.abort(),15000);
+  try{
+    const r=await fetch(FC27_LITE_URL,{cache:'no-cache',signal:ctl.signal});
+    if(!r.ok) throw Error('FC27 compacta '+r.status);
+    const data=await r.json();
+    if(!buildDBFromLiteV82(data)) throw Error('Base compacta incompleta');
+    return true;
+  } finally { clearTimeout(timer) }
+}
+loadDB = async function(){
+  COACHES.forEach(c=>{if(![...els.coach.options].some(o=>o.value===c))els.coach.add(new Option(c,c))});
+  if(![...els.coach.options].some(o=>o.value==='__custom__')) els.coach.add(new Option('✍️ Otro entrenador…','__custom__'));
+  els.coach.onchange=()=>els.coachCustom.classList.toggle('hidden',els.coach.value!=='__custom__');
+  const hasSaved=!!(localStorage.getItem('managerCareerV5')||localStorage.getItem('managerCareerV4')||localStorage.getItem('managerCareerV3')||localStorage.getItem('managerCareerV2'));
+  const savedReady=trySavedFastBootV82();
+  if(savedReady){
+    // Do not block a returning player. Refresh the compact DB lazily only after the UI is usable.
+    setTimeout(async()=>{try{await loadLiteV82();saveLeagueMapV81();backgroundSchedulesV81()}catch(e){console.warn('Actualización FC27 diferida',e)}},800);
+    return;
+  }
+  try{
+    els.loadBar.style.width='18%';
+    els.loadText.textContent='Cargando FC 27 optimizado…';
+    await loadLiteV82();
+    els.loadBar.style.width='100%';
+    els.loadText.textContent='Listo · '+DB.players.length.toLocaleString('es-ES')+' jugadores FC 27';
+    populateCountries();
+    els.coverage.textContent=DB.leagues.size+' ligas europeas · base optimizada para móvil';
+    if(hasSaved) els.continueBtn.classList.remove('hidden');
+    saveLeagueMapV81();
+    setTimeout(()=>backgroundSchedulesV81(),300);
+  }catch(e){
+    console.error(e);
+    els.loadBar.style.width='100%';
+    els.loadBar.style.background='var(--danger)';
+    els.loadText.innerHTML='No ha cargado la base ligera. <button id="retryV82" class="btn primary" type="button">Reintentar</button>';
+    const b=$('#retryV82'); if(b)b.onclick=()=>location.reload();
+  }
+};
+
 loadDB();
 })();
 </script>
