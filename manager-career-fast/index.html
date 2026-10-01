@@ -1244,8 +1244,8 @@ loadDB=async function(){
     const rows={};
     Object.entries(S.standings||{}).forEach(function(entry){rows[entry[0]]={...entry[1]}});
     if(M.fixture.comp==='Liga'){
-      applyProvResultV93(rows,M.fixture.home,M.fixture.away,M.hg||0,M.ag||0);
-      (M.liveRoundV93&&M.liveRoundV93.games||[]).forEach(function(g){applyProvResultV93(rows,g.home,g.away,g.hg,g.ag)});
+      if(!M.fixture.played)applyProvResultV93(rows,M.fixture.home,M.fixture.away,M.hg||0,M.ag||0);
+      if(!(M.liveRoundV93&&M.liveRoundV93.committed))(M.liveRoundV93&&M.liveRoundV93.games||[]).forEach(function(g){applyProvResultV93(rows,g.home,g.away,g.hg,g.ag)});
     }
     return Object.values(rows).sort(function(a,b){return b.pts-a.pts||b.gd-a.gd||b.gf-a.gf});
   }
@@ -1315,6 +1315,14 @@ loadDB=async function(){
   renderMatch=function(M){
     ensureLiveRoundV93(M);renderMatchV93Base(M);
     if(M.fixture.comp==='Liga'){
+      const nowPos=provisionalTableV93(M).findIndex(function(x){return x.club===S.club})+1;
+      const prevPos=M.liveRoundV93&&M.liveRoundV93.lastPos;
+      if(prevPos&&nowPos&&nowPos!==prevPos){
+        const dir=nowPos<prevPos?'subes':'caes';
+        M.liveRoundV93.alerts.unshift('📊 '+dir+' del '+prevPos+'º al '+nowPos+'º provisional');
+        M.liveRoundV93.alerts=M.liveRoundV93.alerts.slice(0,4);
+      }
+      if(M.liveRoundV93)M.liveRoundV93.lastPos=nowPos;
       const holder=document.createElement('div');holder.innerHTML=livePanelV93(M);
       while(holder.firstChild)els.matchBox.appendChild(holder.firstChild);
     }
