@@ -17,10 +17,10 @@ button{font:inherit}
 </head>
 <body>
 <div id="game"></div>
-<div id="hud"><b>Trapagaran 3D</b><br>Zona: Estrada del Molino / centro<br>Velocidad: <span id="speed">0</span> km/h</div>
-<div id="status">Cargando calles y edificios reales de OpenStreetMap…</div>
+<div id="hud"><b>Trapagaran 3D</b><br>Zona: Estrada del Molino / centro<br>Base: Ortofoto oficial 2025<br>Velocidad: <span id="speed">0</span> km/h</div>
+<div id="status">Cargando Trapagaran real: ortofoto 2025 + calles y edificios…</div>
 <div id="help">WASD / flechas · Shift correr · Espacio saltar · Arrastra con el ratón para girar cámara</div>
-<div id="credit">© OpenStreetMap contributors</div>
+<div id="credit">Ortofoto © Eusko Jaurlaritza / Gobierno Vasco · © OpenStreetMap contributors</div>
 <script type="module">
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
 
@@ -52,13 +52,27 @@ sun.shadow.mapSize.set(2048,2048);
 sun.shadow.camera.left=-300; sun.shadow.camera.right=300; sun.shadow.camera.top=300; sun.shadow.camera.bottom=-300;
 scene.add(sun);
 
-const ground=new THREE.Mesh(
-  new THREE.PlaneGeometry(2200,2200),
-  new THREE.MeshStandardMaterial({color:0x617e4f,roughness:1})
-);
+const ORTHO_URL="https://www.geo.euskadi.eus/geoeuskadi/rest/services/U11/ORTOARGAZKIAK/MapServer/export?bbox=-338954.0881406058,5357778.39636691,-337254.0881406058,5359478.39636691&bboxSR=3857&imageSR=3857&layers=show%3A189&size=2048,2048&format=jpg&transparent=false&f=image";
+const groundMat=new THREE.MeshStandardMaterial({color:0x617e4f,roughness:.95});
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(1700,1700),groundMat);
 ground.rotation.x=-Math.PI/2;
 ground.receiveShadow=true;
 scene.add(ground);
+
+const orthoLoader=new THREE.TextureLoader();
+orthoLoader.setCrossOrigin("anonymous");
+orthoLoader.load(
+  ORTHO_URL,
+  tex=>{
+    tex.colorSpace=THREE.SRGBColorSpace;
+    tex.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+    groundMat.map=tex;
+    groundMat.color.set(0xffffff);
+    groundMat.needsUpdate=true;
+  },
+  undefined,
+  ()=>{ console.warn("No se pudo cargar la ortofoto; se mantiene el terreno de respaldo."); }
+);
 
 const world=new THREE.Group();
 scene.add(world);
