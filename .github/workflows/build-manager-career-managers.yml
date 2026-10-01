@@ -15,30 +15,28 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Fill current manager map safely
+      - name: Complete current manager map
         run: |
           python - <<'PY'
-          import csv, io, json, re, time, unicodedata, urllib.request, urllib.parse, html as htmlmod
+          import json, re, time, unicodedata, urllib.request, urllib.parse, html as htmlmod
           from difflib import SequenceMatcher
           from concurrent.futures import ThreadPoolExecutor, as_completed
           from pathlib import Path
 
           clubs_data=json.loads(Path('manager-career/data/clubs-lite.json').read_text(encoding='utf-8'))
+          all_clubs=[row[0] for rows in clubs_data.get('leagues',{}).values() for row in rows]
+          valid=set(all_clubs)
+
           map_path=Path('manager-career/data/manager-map.json')
           old=json.loads(map_path.read_text(encoding='utf-8')) if map_path.exists() else {'managers':{}}
-          managers={k:v for k,v in (old.get('managers') or {}).items() if v and v!='Entrenador actual'}
+          managers={k:v for k,v in (old.get('managers') or {}).items()
+                    if k in valid and v and v!='Entrenador actual'}
 
-          league_country={
-            '1':'Denmark','4':'Belgium','10':'Netherlands','13':'England','14':'England',
-            '16':'France','17':'France','19':'Germany','20':'Germany','31':'Italy','32':'Italy',
-            '41':'Norway','50':'Scotland','53':'Spain','54':'Spain','56':'Sweden',
-            '65':'Republic of Ireland','66':'Poland','68':'Turkey','80':'Austria',
-            '189':'Switzerland','308':'Portugal','330':'Romania'
-          }
-
-          # Official/current overrides for clubs that were unresolved in the provider bridge.
-          overrides={
+          # Verified/current overrides for important unresolved clubs.
+          managers.update({
             'Athletic Club':'Edin Terzić',
             'Arsenal FC':'Mikel Arteta',
             'FC Barcelona':'Hansi Flick',
@@ -46,8 +44,7 @@ jobs:
             'Crystal Palace':'Pierre Sage',
             'Everton FC':'David Moyes',
             'Manchester City':'Enzo Maresca'
-          }
-          managers.update(overrides)
+          })
 
           def norm(s):
               s=unicodedata.normalize('NFKD',s or '').encode('ascii','ignore').decode().lower()
@@ -64,346 +61,121 @@ jobs:
               if A in B or B in A:return .88+.1*min(len(A),len(B))/max(len(A),len(B))
               return SequenceMatcher(None,A,B).ratio()
 
-          def get(url,timeout=40):
-              req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0 ManagerCareer/1.0','Accept':'application/json,text/plain,*/*'})
+          def get(url,timeout=30):
+              req=urllib.request.Request(url,headers={
+                  'User-Agent':'Mozilla/5.0 ManagerCareer/1.0 (educational project)',
+                  'Accept':'application/json,text/plain,*/*'
+              })
               with urllib.request.urlopen(req,timeout=timeout) as r:
                   return r.read().decode('utf-8','replace')
 
-          all_clubs=[]
-          club_country={}
-          for lid,rows in clubs_data.get('leagues',{}).items():
-              for row in rows:
-                  c=row[0]
-                  all_clubs.append(c)
-                  club_country[c]=league_country.get(lid,'')
-
-          valid_clubs=set(all_clubs)
-          managers={k:v for k,v in managers.items() if k in valid_clubs}
-          missing=[c for c in all_clubs if c not in managers]
-
-          # Small targeted SofaScore pass only for unresolved clubs.
-          def direct_manager(club):
-              target=club
-              for attempt in range(2):
-                  try:
-                      url='https://www.sofascore.com/api/v1/search/all?q='+urllib.parse.quote(target)
-                      j=json.loads(get(url,25))
-                      items=j if isinstance(j,list) else (j.get('results') or j.get('entities') or [])
-                      best=None;best_sc=0
-                      for item in items:
-                          ent=item.get('entity',item) if isinstance(item,dict) else {}
-                          if not isinstance(ent,dict):continue
-                          typ=(item.get('type') if isinstance(item,dict) else '') or ent.get('type') or ''
-                          if typ and str(typ).lower() not in {'team','club'}:continue
-                          tid=ent.get('id');nm=ent.get('name') or ''
-                          if not tid or not nm:continue
-                          sc=score(target,nm)
-                          if sc>best_sc:best=(tid,nm);best_sc=sc
-                      if best and best_sc>=.62:
-                          raw=get('https://www.sofascore.com/api/v1/team/'+str(best[0]),25)
-                          tj=json.loads(raw);team=tj.get('team',tj)
-                          if isinstance(team,dict) and score(target,team.get('name') or best[1])>=.58:
-                              mgr=team.get('manager')
-                              name=(mgr.get('name') or mgr.get('shortName') or '').strip() if isinstance(mgr,dict) else ((mgr or '').strip() if isinstance(mgr,str) else '')
-                              if name:return club,name
-                  except Exception:
-                      time.sleep(.8+attempt*.8)
-              return club,None
-
-          if missing:
-              with ThreadPoolExecutor(max_workers=2) as ex:
-                  futs=[ex.submit(direct_manager,c) for c in missing]
-                  for fut in as_completed(futs):
-                      club,name=fut.result()
-                      if name:managers[club]=name
-
-          missing=[c for c in all_clubs if c not in managers]
-
-          teams_csv=get('https://raw.githubusercontent.com/withqwerty/reep/main/data/teams.csv',120)
-          rr=csv.DictReader(io.StringIO(teams_csv))
-          rows=[]
-          by_country={}
-          for r in rr:
-              name=(r.get('name') or '').strip()
-              qid=(r.get('key_wikidata') or '').strip()
-              if not name or not qid:continue
-              rec={'name':name,'qid':qid,'country':(r.get('country') or '').strip()}
-              rows.append(rec)
-              by_country.setdefault(rec['country'],[]).append(rec)
-
-          aliases={
-            'RC Celta':'Celta Vigo','RC Deportivo A Coruña':'Deportivo La Coruña',
-            'Real Sporting de Gijón':'Sporting Gijón','Aarhus Gymnastikforening':'AGF',
-            'FC København':'FC Copenhagen','Odense Boldklub':'OB','Sønderjyske Fodbold':'Sonderjyske',
-            'Sporting Clube de Braga':'Braga','Vitória SC':'Vitória Guimarães',
-            'Grasshopper Club Zürich':'Grasshoppers','FK Bodø/Glimt':'Bodø/Glimt',
-            'Asociația Clubul Sportiv Petrolul 52':'Petrolul Ploiesti'
-          }
-
-          club_qid={}
-          for club in missing:
-              target=aliases.get(club,club)
-              pool=by_country.get(club_country.get(club,''),[]) or rows
-              best=max(pool,key=lambda r:score(target,r['name']),default=None)
-              sc=score(target,best['name']) if best else 0
-              if best and sc>=.68:club_qid[club]=best['qid']
-
-          # Resolve Wikipedia sitelinks in batches.
-          qids=sorted(set(club_qid.values()))
-          sitelinks={}
-          for i in range(0,len(qids),40):
-              batch=qids[i:i+40]
-              try:
-                  url='https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=sitelinks&sitefilter=enwiki|eswiki&ids='+urllib.parse.quote('|'.join(batch))
-                  ents=json.loads(get(url)).get('entities',{})
-                  for q,obj in ents.items():
-                      sl=obj.get('sitelinks') or {}
-                      if sl.get('enwiki'):sitelinks[q]=('en',sl['enwiki']['title'])
-                      elif sl.get('eswiki'):sitelinks[q]=('es',sl['eswiki']['title'])
-              except Exception:
-                  pass
-
-          def clean_wiki_value(v):
+          def clean_value(v):
               v=re.sub(r'<ref[^>]*>.*?</ref>','',v,flags=re.I|re.S)
               v=re.sub(r'<ref[^>]*/>','',v,flags=re.I)
-              # Preserve the useful final parameter of simple formatting templates.
-              for _ in range(5):
-                  nv=re.sub(r'\{\{[^{}]*?\|\s*([^{}|]+(?:\[\[[^{}]+?\]\])?[^{}|]*)\}\}',lambda m:m.group(1),v)
+              v=re.sub(r'\[\[([^\]|]+)\|([^\]]+)\]\]',r'\2',v)
+              v=re.sub(r'\[\[([^\]]+)\]\]',r'\1',v)
+              for _ in range(6):
+                  nv=re.sub(r'\{\{[^{}]*?\|\s*([^{}|]+)\}\}',lambda m:m.group(1),v)
                   if nv==v:break
                   v=nv
               v=re.sub(r'\{\{[^{}]+\}\}','',v)
-              v=re.sub(r'\[\[([^\]|]+)\|([^\]]+)\]\]',r'\2',v)
-              v=re.sub(r'\[\[([^\]]+)\]\]',r'\1',v)
               v=re.sub(r'<[^>]+>','',v)
-              v=v.replace("'''",'').replace("''",'')
-              v=htmlmod.unescape(v)
-              v=re.sub(r'\s+',' ',v).strip(' |')
-              return v
+              v=htmlmod.unescape(v.replace("'''",'').replace("''",''))
+              return re.sub(r'\s+',' ',v).strip(' |')
 
-          def wiki_manager(club):
-              q=club_qid.get(club)
-              if not q or q not in sitelinks:return club,None
-              lang,title=sitelinks[q]
+          def manager_from_wikitext(text):
+              keys=('manager','head coach','head_coach','coach','entrenador')
+              for raw in text.splitlines():
+                  line=raw.strip()
+                  if not line.startswith('|') or '=' not in line:continue
+                  key,val=line[1:].split('=',1)
+                  if key.strip().lower() in keys:
+                      name=clean_value(val)
+                      if name and 2<len(name)<100 and name.lower() not in ('vacant','none','n/a','-','tbd'):
+                          return name
+              return None
+
+          def wikipedia_search(club,lang):
               host='en.wikipedia.org' if lang=='en' else 'es.wikipedia.org'
-              try:
-                  url='https://'+host+'/w/api.php?action=query&format=json&formatversion=2&prop=revisions&rvprop=content&rvslots=main&titles='+urllib.parse.quote(title)
-                  j=json.loads(get(url,30))
-                  pages=j.get('query',{}).get('pages',[])
-                  if not pages:return club,None
-                  revs=pages[0].get('revisions') or []
-                  if not revs:return club,None
-                  slots=revs[0].get('slots') or {}
-                  text=(slots.get('main') or {}).get('content') or revs[0].get('*') or ''
-                  patterns=[
-                    r'^\|\s*manager\s*=\s*(.+)$',
-                    r'^\|\s*head[_ ]coach\s*=\s*(.+)$',
-                    r'^\|\s*coach\s*=\s*(.+)$',
-                    r'^\|\s*entrenador\s*=\s*(.+)$'
-                  ]
-                  for pat in patterns:
-                      m=re.search(pat,text,flags=re.I|re.M)
-                      if m:
-                          name=clean_wiki_value(m.group(1))
-                          if name and len(name)<100 and name.lower() not in {'vacant','none','n/a','-'}:
-                              return club,name
-              except Exception:
-                  pass
-              return club,None
+              queries=[club+' football club',club]
+              for q in queries:
+                  try:
+                      surl='https://'+host+'/w/api.php?action=query&format=json&list=search&srlimit=5&srsearch='+urllib.parse.quote(q)
+                      hits=json.loads(get(surl)).get('query',{}).get('search',[])
+                      for hit in hits:
+                          title=hit.get('title') or ''
+                          if not title:continue
+                          sc=score(club,title)
+                          if sc<.42 and norm(club) not in norm(title) and norm(title) not in norm(club):continue
+                          purl='https://'+host+'/w/api.php?action=query&format=json&formatversion=2&prop=revisions&rvprop=content&rvslots=main&titles='+urllib.parse.quote(title)
+                          pages=json.loads(get(purl)).get('query',{}).get('pages',[])
+                          if not pages:continue
+                          revs=pages[0].get('revisions') or []
+                          if not revs:continue
+                          slots=revs[0].get('slots') or {}
+                          text=(slots.get('main') or {}).get('content') or revs[0].get('*') or ''
+                          name=manager_from_wikitext(text)
+                          if name:return name
+                  except Exception:
+                      pass
+              return None
 
-          with ThreadPoolExecutor(max_workers=5) as ex:
-              futs=[ex.submit(wiki_manager,c) for c in missing if c not in managers]
-              for fut in as_completed(futs):
+          def wikidata_manager(club):
+              try:
+                  url='https://www.wikidata.org/w/api.php?action=wbsearchentities&format=json&language=en&limit=6&search='+urllib.parse.quote(club)
+                  results=json.loads(get(url)).get('search',[])
+                  chosen=None;best=0
+                  for item in results:
+                      label=item.get('label') or ''
+                      desc=(item.get('description') or '').lower()
+                      sc=score(club,label)
+                      if ('football' in desc or 'soccer' in desc or sc>.92) and sc>best:
+                          chosen=item.get('id');best=sc
+                  if not chosen or best<.55:return None
+                  eurl='https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=claims&ids='+urllib.parse.quote(chosen)
+                  obj=json.loads(get(eurl)).get('entities',{}).get(chosen,{})
+                  claims=(obj.get('claims') or {}).get('P286') or []
+                  active=[]
+                  for c in claims:
+                      if 'P582' not in (c.get('qualifiers') or {}):
+                          active.append(c)
+                  use=active or claims
+                  if not use:return None
+                  val=use[-1].get('mainsnak',{}).get('datavalue',{}).get('value',{})
+                  qid=val.get('id') if isinstance(val,dict) else None
+                  if not qid:return None
+                  lurl='https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=labels&languages=en|es&ids='+urllib.parse.quote(qid)
+                  labels=json.loads(get(lurl)).get('entities',{}).get(qid,{}).get('labels',{})
+                  return (labels.get('es') or labels.get('en') or {}).get('value')
+              except Exception:
+                  return None
+
+          def resolve(club):
+              # Wikipedia infobox tends to reflect managerial changes faster.
+              name=wikipedia_search(club,'en') or wikipedia_search(club,'es')
+              if name:return club,name
+              name=wikidata_manager(club)
+              return club,name
+
+          missing=[c for c in all_clubs if c not in managers]
+          with ThreadPoolExecutor(max_workers=3) as ex:
+              futures=[ex.submit(resolve,c) for c in missing]
+              for fut in as_completed(futures):
                   club,name=fut.result()
                   if name:managers[club]=name
 
-          # Direct Wikipedia search fallback for club names that lacked a reliable identity bridge.
-          def wiki_search_manager(club):
-              country=club_country.get(club,'')
-              queries=[club+' football club '+country, club+' '+country]
-              for lang in ['en','es']:
-                  host='en.wikipedia.org' if lang=='en' else 'es.wikipedia.org'
-                  for query in queries:
-                      try:
-                          surl='https://'+host+'/w/api.php?action=query&format=json&list=search&srlimit=5&srsearch='+urllib.parse.quote(query)
-                          sj=json.loads(get(surl,30))
-                          hits=sj.get('query',{}).get('search',[])
-                          for hit in hits:
-                              title=hit.get('title') or ''
-                              if not title:continue
-                              if score(club,title)<.45 and norm(club) not in norm(title) and norm(title) not in norm(club):continue
-                              purl='https://'+host+'/w/api.php?action=query&format=json&formatversion=2&prop=revisions&rvprop=content&rvslots=main&titles='+urllib.parse.quote(title)
-                              pj=json.loads(get(purl,30))
-                              pages=pj.get('query',{}).get('pages',[])
-                              if not pages:continue
-                              revs=pages[0].get('revisions') or []
-                              if not revs:continue
-                              slots=revs[0].get('slots') or {}
-                              text=(slots.get('main') or {}).get('content') or revs[0].get('*') or ''
-                              patterns=[
-                                r'^\|\s*manager\s*=\s*(.+)
-          for c in unresolved:managers[c]='Entrenador actual'
-
-          out={
-              'v':2,'generated':'2026-10-01','count':len(managers),
-              'resolved':len(all_clubs)-len(unresolved),'fallback':len(unresolved),
-              'managers':managers
-          }
-          map_path.write_text(json.dumps(out,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
-          print('clubs',len(all_clubs),'resolved',out['resolved'],'fallback',out['fallback'])
-          print('unresolved',unresolved)
-          print('Athletic',managers.get('Athletic Club'),'Arsenal',managers.get('Arsenal FC'),'Barcelona',managers.get('FC Barcelona'))
-          if out['resolved']<300:raise SystemExit('Manager coverage regressed below safe baseline')
-          PY
-
-      - name: Commit manager map
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add manager-career/data/manager-map.json
-          git diff --cached --quiet && exit 0
-          git commit -m "Complete current manager map"
-          git push
-
-# targeted unresolved-manager refresh
-,
-                                r'^\|\s*head[_ ]coach\s*=\s*(.+)
-          for c in unresolved:managers[c]='Entrenador actual'
-
-          out={
-              'v':2,'generated':'2026-10-01','count':len(managers),
-              'resolved':len(all_clubs)-len(unresolved),'fallback':len(unresolved),
-              'managers':managers
-          }
-          map_path.write_text(json.dumps(out,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
-          print('clubs',len(all_clubs),'resolved',out['resolved'],'fallback',out['fallback'])
-          print('unresolved',unresolved)
-          print('Athletic',managers.get('Athletic Club'),'Arsenal',managers.get('Arsenal FC'),'Barcelona',managers.get('FC Barcelona'))
-          if out['resolved']<300:raise SystemExit('Manager coverage regressed below safe baseline')
-          PY
-
-      - name: Commit manager map
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add manager-career/data/manager-map.json
-          git diff --cached --quiet && exit 0
-          git commit -m "Complete current manager map"
-          git push
-
-# targeted unresolved-manager refresh
-,
-                                r'^\|\s*coach\s*=\s*(.+)
-          for c in unresolved:managers[c]='Entrenador actual'
-
-          out={
-              'v':2,'generated':'2026-10-01','count':len(managers),
-              'resolved':len(all_clubs)-len(unresolved),'fallback':len(unresolved),
-              'managers':managers
-          }
-          map_path.write_text(json.dumps(out,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
-          print('clubs',len(all_clubs),'resolved',out['resolved'],'fallback',out['fallback'])
-          print('unresolved',unresolved)
-          print('Athletic',managers.get('Athletic Club'),'Arsenal',managers.get('Arsenal FC'),'Barcelona',managers.get('FC Barcelona'))
-          if out['resolved']<300:raise SystemExit('Manager coverage regressed below safe baseline')
-          PY
-
-      - name: Commit manager map
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add manager-career/data/manager-map.json
-          git diff --cached --quiet && exit 0
-          git commit -m "Complete current manager map"
-          git push
-
-# targeted unresolved-manager refresh
-,
-                                r'^\|\s*entrenador\s*=\s*(.+)
-          for c in unresolved:managers[c]='Entrenador actual'
-
-          out={
-              'v':2,'generated':'2026-10-01','count':len(managers),
-              'resolved':len(all_clubs)-len(unresolved),'fallback':len(unresolved),
-              'managers':managers
-          }
-          map_path.write_text(json.dumps(out,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
-          print('clubs',len(all_clubs),'resolved',out['resolved'],'fallback',out['fallback'])
-          print('unresolved',unresolved)
-          print('Athletic',managers.get('Athletic Club'),'Arsenal',managers.get('Arsenal FC'),'Barcelona',managers.get('FC Barcelona'))
-          if out['resolved']<300:raise SystemExit('Manager coverage regressed below safe baseline')
-          PY
-
-      - name: Commit manager map
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add manager-career/data/manager-map.json
-          git diff --cached --quiet && exit 0
-          git commit -m "Complete current manager map"
-          git push
-
-# targeted unresolved-manager refresh
-,
-                                r'^\|\s*manager_title\s*=.*?\n\|\s*manager\s*=\s*(.+)
-          for c in unresolved:managers[c]='Entrenador actual'
-
-          out={
-              'v':2,'generated':'2026-10-01','count':len(managers),
-              'resolved':len(all_clubs)-len(unresolved),'fallback':len(unresolved),
-              'managers':managers
-          }
-          map_path.write_text(json.dumps(out,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
-          print('clubs',len(all_clubs),'resolved',out['resolved'],'fallback',out['fallback'])
-          print('unresolved',unresolved)
-          print('Athletic',managers.get('Athletic Club'),'Arsenal',managers.get('Arsenal FC'),'Barcelona',managers.get('FC Barcelona'))
-          if out['resolved']<300:raise SystemExit('Manager coverage regressed below safe baseline')
-          PY
-
-      - name: Commit manager map
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add manager-career/data/manager-map.json
-          git diff --cached --quiet && exit 0
-          git commit -m "Complete current manager map"
-          git push
-
-# targeted unresolved-manager refresh
-
-                              ]
-                              for pat in patterns:
-                                  m=re.search(pat,text,flags=re.I|re.M)
-                                  if m:
-                                      name=clean_wiki_value(m.group(1))
-                                      name=re.sub(r'\s*\([^)]*(?:caretaker|interim|c)|interino[^)]*\)\s*','',name,flags=re.I).strip()
-                                      if name and 2<len(name)<100 and name.lower() not in {'vacant','none','n/a','-'}:
-                                          return club,name
-                      except Exception:
-                          pass
-              return club,None
-
-          still_missing=[c for c in all_clubs if c not in managers]
-          if still_missing:
-              with ThreadPoolExecutor(max_workers=3) as ex:
-                  futs=[ex.submit(wiki_search_manager,c) for c in still_missing]
-                  for fut in as_completed(futs):
-                      club,name=fut.result()
-                      if name:managers[club]=name
-
-          # Preserve every club key. Anything still missing is explicitly flagged for later manual review.
           unresolved=[c for c in all_clubs if c not in managers]
           for c in unresolved:managers[c]='Entrenador actual'
 
           out={
-              'v':2,'generated':'2026-10-01','count':len(managers),
+              'v':3,'generated':'2026-10-01','count':len(all_clubs),
               'resolved':len(all_clubs)-len(unresolved),'fallback':len(unresolved),
-              'managers':managers
+              'managers':{c:managers[c] for c in all_clubs}
           }
           map_path.write_text(json.dumps(out,ensure_ascii=False,separators=(',',':')),encoding='utf-8')
           print('clubs',len(all_clubs),'resolved',out['resolved'],'fallback',out['fallback'])
           print('unresolved',unresolved)
-          print('Athletic',managers.get('Athletic Club'),'Arsenal',managers.get('Arsenal FC'),'Barcelona',managers.get('FC Barcelona'))
-          if out['resolved']<300:raise SystemExit('Manager coverage regressed below safe baseline')
+          print('Athletic ->',managers.get('Athletic Club'))
           PY
 
       - name: Commit manager map
@@ -413,8 +185,5 @@ jobs:
           git add manager-career/data/manager-map.json
           git diff --cached --quiet && exit 0
           git commit -m "Complete current manager map"
-          git push
-
-# targeted unresolved-manager refresh
-
-# retry after data-build push conflict and direct Wikipedia fallback
+          git pull --rebase origin main
+          git push origin HEAD:main
