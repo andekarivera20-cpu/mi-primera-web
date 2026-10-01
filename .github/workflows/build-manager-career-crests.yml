@@ -15,6 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Clone crest repository
+        run: git clone --depth 1 https://github.com/JoseArroyave/football-logos.git /tmp/football-logos
+
       - name: Build exact crest map
         run: |
           python - <<'PY'
@@ -73,11 +76,9 @@ jobs:
           }
 
           def fetch_dir(country):
-              url=f'https://api.github.com/repos/JoseArroyave/football-logos/contents/logos/{country}?ref=main'
-              req=urllib.request.Request(url,headers={'User-Agent':'manager-career'})
-              with urllib.request.urlopen(req,timeout=30) as r:
-                  arr=json.load(r)
-              return [x['name'][:-4] for x in arr if x.get('type')=='file' and x['name'].endswith('.svg')]
+              p=Path('/tmp/football-logos/logos')/country
+              if not p.exists(): return []
+              return [x.stem for x in p.iterdir() if x.is_file() and x.suffix.lower()=='.svg']
 
           countries=set(league_country.values())
           for v in manual.values():
@@ -153,3 +154,5 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "Build exact crest map for Manager Career"
           git push
+
+# retry without GitHub API rate-limit
