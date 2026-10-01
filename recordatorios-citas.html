@@ -22,14 +22,14 @@ h2{font-size:17px;margin:0 0 4px}.sub{color:var(--muted);font-size:13px;margin:0
     <p class="sub">Tus citas se guardan en la nube y solo las ve tu cuenta.</p>
     <div class="field"><label>Email</label><input id="authEmail" type="email" placeholder="tu@email.com"></div>
     <div class="field" style="margin-top:10px"><label>Contraseña</label><input id="authPass" type="password" placeholder="Mínimo 6 caracteres"></div>
-    <div class="actions"><button class="btn primary" id="loginBtn">Entrar</button><button class="btn secondary" id="signupBtn">Crear cuenta</button></div>
-    <div class="note"><strong>Primera vez:</strong> pulsa “Crear cuenta”. Si te pide confirmar el email, revisa tu correo y vuelve a entrar.</div>
+    <div class="actions"><button class="btn primary" id="demoLoginBtn">Entrar en demo</button><button class="btn secondary" id="loginBtn">Entrar con cuenta</button><button class="btn secondary" id="signupBtn">Crear cuenta</button></div>
+    <div class="note"><strong>Para probarlo ahora:</strong> pulsa “Entrar en demo”. No necesitas usuario ni contraseña. La cuenta solo hará falta cuando lo use un negocio real.</div>
   </div>
 
   <div id="appView" class="hidden">
     <div class="topbar">
       <div class="brand"><div class="logo">RC</div><div><h1>Recordatorios de citas</h1><p id="businessLabel">Panel del negocio</p></div></div>
-      <div><span class="badge">Nube conectada</span> <button class="btn secondary small" id="logoutBtn">Salir</button></div>
+      <div><span class="badge" id="modeBadge">Nube conectada</span> <button class="btn secondary small" id="logoutBtn">Salir</button></div>
     </div>
 
     <div class="stats">
@@ -57,7 +57,7 @@ h2{font-size:17px;margin:0 0 4px}.sub{color:var(--muted);font-size:13px;margin:0
           </form>
         </div>
 
-        <div class="card cardpad settings">
+        <div class="card cardpad settings" id="whatsappSettings">
           <h2>Conectar WhatsApp Business</h2>
           <p class="sub">El token se guarda cifrado en Supabase Vault, no en la web.</p>
           <div class="field"><label>Nombre del negocio</label><input id="bizName" placeholder="Barbería Norte"></div>
@@ -91,7 +91,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const SUPABASE_URL='https://rzbwbilscgeeprflviwf.supabase.co';
 const SUPABASE_KEY='sb_publishable_m-Z2NAiEYucjQhOJ2N5Wvw_7RqrtmCu';
 const sb=createClient(SUPABASE_URL,SUPABASE_KEY);
-let business=null,appointments=[],editingId=null;
+let business=null,appointments=[],editingId=null,demoMode=false;
+const DEMO_KEY='recordatorios_demo_v2';
 const $=id=>document.getElementById(id);
 
 function toast(msg){$('toast').textContent=msg;$('toast').style.display='block';setTimeout(function(){$('toast').style.display='none'},2800)}
@@ -103,6 +104,25 @@ function message(){
   return s+'.\nSi no puedes venir, avísanos con tiempo. ¡Gracias!';
 }
 function updatePreview(){$('preview').textContent=message()}
+function demoSave(){localStorage.setItem(DEMO_KEY,JSON.stringify(appointments))}
+function demoLoad(){
+  try{appointments=JSON.parse(localStorage.getItem(DEMO_KEY)||'[]')}catch(e){appointments=[]}
+  if(!appointments.length){
+    const d=new Date();d.setDate(d.getDate()+1);
+    appointments=[{id:'demo-'+Date.now(),business_id:'demo',client_name:'Cliente de ejemplo',phone:'600123123',worker:'Iker',service:'Corte',appointment_at:new Date(d.toISOString().slice(0,10)+'T18:00:00').toISOString(),reminder_hours:24,reminder_at:new Date(d.getTime()-24*3600000).toISOString(),channel:'whatsapp',reminder_status:'pending'}];
+    demoSave();
+  }
+  render();
+}
+function enterDemo(){
+  demoMode=true;
+  business={id:'demo',name:'Negocio demo',whatsapp_configured:false};
+  $('authView').classList.add('hidden');$('appView').classList.remove('hidden');
+  $('businessLabel').textContent='Negocio demo';
+  $('modeBadge').textContent='Modo demo';
+  $('whatsappSettings').innerHTML='<h2>WhatsApp automático</h2><p class="sub">En la demo puedes crear, editar y borrar citas sin cuenta.</p><div class="note"><strong>Versión real</strong>Cuando un negocio contrate el sistema, aquí conectaremos su WhatsApp Business para que los recordatorios se envíen solos.</div>';
+  demoLoad();
+}
 ['client','date','time','service','worker'].forEach(function(id){$(id).addEventListener('input',updatePreview)});
 
 async function ensureBusiness(){
@@ -110,7 +130,7 @@ async function ensureBusiness(){
   const two=await sb.from('reminder_businesses').select('*').eq('id',one.data).single();if(two.error)throw two.error;
   business=two.data;$('businessLabel').textContent=business.name;$('bizName').value=business.name||'';$('waPhoneId').value=business.whatsapp_phone_number_id||'';$('waTemplate').value=business.whatsapp_template_name||'appointment_reminder';$('waLang').value=business.whatsapp_template_language||'es';$('waState').textContent=business.whatsapp_configured?'WhatsApp configurado ✅':'WhatsApp todavía no está conectado.';
 }
-async function loadAppointments(){const r=await sb.from('reminder_appointments').select('*').eq('business_id',business.id).order('appointment_at',{ascending:true});if(r.error)throw r.error;appointments=r.data||[];render()}
+async function loadAppointments(){if(demoMode){demoLoad();return}const r=await sb.from('reminder_appointments').select('*').eq('business_id',business.id).order('appointment_at',{ascending:true});if(r.error)throw r.error;appointments=r.data||[];render()}
 function dt(a){return new Date(a.appointment_at)}
 function fmt(a){return dt(a).toLocaleString('es-ES',{weekday:'short',day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}
 function statusText(s){return ({pending:'Pendiente',processing:'Procesando',sent:'Enviado',failed:'Error',cancelled:'Cancelada',waiting_provider:'Esperando WhatsApp'})[s]||s}
@@ -131,23 +151,29 @@ $('search').addEventListener('input',render);
 $('apptForm').addEventListener('submit',async function(e){
   e.preventDefault();const when=new Date($('date').value+'T'+$('time').value+':00');const hours=Number($('reminder').value);const reminderAt=new Date(when.getTime()-hours*3600000);
   const payload={business_id:business.id,client_name:$('client').value.trim(),phone:$('phone').value.trim(),worker:$('worker').value.trim()||null,service:$('service').value.trim()||null,appointment_at:when.toISOString(),reminder_hours:hours,reminder_at:reminderAt.toISOString(),channel:$('channel').value,reminder_status:'pending',sent_at:null,last_error:null,provider_message_id:null};
+  if(demoMode){
+    if(editingId){appointments=appointments.map(function(a){return a.id===editingId?Object.assign({},a,payload):a})}
+    else{payload.id='demo-'+Date.now();appointments.push(payload)}
+    demoSave();editingId=null;e.target.reset();setDefaultDate();updatePreview();render();toast('Cita guardada en la demo');return;
+  }
   const r=editingId?await sb.from('reminder_appointments').update(payload).eq('id',editingId):await sb.from('reminder_appointments').insert(payload);
   if(r.error){toast(r.error.message);return}editingId=null;e.target.reset();setDefaultDate();updatePreview();await loadAppointments();toast('Cita guardada');
 });
 window.editAppt=async function(id){const a=appointments.find(function(x){return x.id===id});if(!a)return;editingId=id;$('client').value=a.client_name;$('phone').value=a.phone;$('worker').value=a.worker||'';$('service').value=a.service||'';$('reminder').value=String(a.reminder_hours);$('channel').value=a.channel;const x=new Date(a.appointment_at);$('date').value=x.toISOString().slice(0,10);$('time').value=x.toTimeString().slice(0,5);updatePreview();scrollTo({top:0,behavior:'smooth'})};
-window.deleteAppt=async function(id){if(!confirm('¿Eliminar esta cita?'))return;const r=await sb.from('reminder_appointments').delete().eq('id',id);if(r.error)toast(r.error.message);else{await loadAppointments();toast('Cita eliminada')}};
+window.deleteAppt=async function(id){if(!confirm('¿Eliminar esta cita?'))return;if(demoMode){appointments=appointments.filter(function(a){return a.id!==id});demoSave();render();toast('Cita eliminada');return}const r=await sb.from('reminder_appointments').delete().eq('id',id);if(r.error)toast(r.error.message);else{await loadAppointments();toast('Cita eliminada')}};
 $('demoBtn').addEventListener('click',function(){$('client').value='Mikel';$('phone').value='600 456 789';$('worker').value='Iker';$('service').value='Corte + barba';const d=new Date();d.setDate(d.getDate()+2);$('date').value=d.toISOString().slice(0,10);$('time').value='17:30';updatePreview()});
 
-$('saveWaBtn').addEventListener('click',async function(){
+$('saveWaBtn').addEventListener('click',async function(){if(demoMode){toast('En la demo no hace falta conectar WhatsApp');return}
   if($('bizName').value.trim()&&$('bizName').value.trim()!==business.name){const b=await sb.from('reminder_businesses').update({name:$('bizName').value.trim()}).eq('id',business.id);if(b.error){toast(b.error.message);return}}
   if(!$('waPhoneId').value.trim()||!$('waToken').value.trim()){toast('Faltan Phone Number ID y Access Token');return}
   const r=await sb.rpc('reminder_set_whatsapp_config',{p_phone_number_id:$('waPhoneId').value.trim(),p_access_token:$('waToken').value.trim(),p_template_name:$('waTemplate').value.trim()||'appointment_reminder',p_template_language:$('waLang').value.trim()||'es'});
   if(r.error){toast(r.error.message);return}$('waToken').value='';await ensureBusiness();toast('WhatsApp guardado de forma segura');
 });
 async function enter(){const g=await sb.auth.getSession();if(!g.data.session){$('authView').classList.remove('hidden');$('appView').classList.add('hidden');return}$('authView').classList.add('hidden');$('appView').classList.remove('hidden');try{await ensureBusiness();await loadAppointments()}catch(e){toast(e.message)}}
+$('demoLoginBtn').addEventListener('click',function(){enterDemo()});
 $('loginBtn').addEventListener('click',async function(){const r=await sb.auth.signInWithPassword({email:$('authEmail').value.trim(),password:$('authPass').value});if(r.error)toast(r.error.message);else enter()});
 $('signupBtn').addEventListener('click',async function(){const r=await sb.auth.signUp({email:$('authEmail').value.trim(),password:$('authPass').value});if(r.error)toast(r.error.message);else toast('Cuenta creada. Si te pide confirmar email, revisa tu correo.')});
-$('logoutBtn').addEventListener('click',async function(){await sb.auth.signOut();location.reload()});
+$('logoutBtn').addEventListener('click',async function(){if(!demoMode)await sb.auth.signOut();location.reload()});
 setDefaultDate();updatePreview();enter();
 </script>
 </body>
