@@ -1,0 +1,227 @@
+name: Build Manager Career Manager Map
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-manager-career-managers.yml'
+      - 'manager-career/data/clubs-lite.json'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build current manager map
+        run: |
+          python - <<'PY'
+          import csv, io, json, re, time, unicodedata, urllib.request, urllib.parse
+          from difflib import SequenceMatcher
+          from concurrent.futures import ThreadPoolExecutor, as_completed
+          from pathlib import Path
+
+          CLUBS=Path('manager-career/data/clubs-lite.json')
+          data=json.loads(CLUBS.read_text(encoding='utf-8'))
+          league_country={
+            '1':'Denmark','4':'Belgium','10':'Netherlands','13':'England','14':'England',
+            '16':'France','17':'France','19':'Germany','20':'Germany','31':'Italy','32':'Italy',
+            '41':'Norway','50':'Scotland','53':'Spain','54':'Spain','56':'Sweden',
+            '65':'Republic of Ireland','66':'Poland','68':'Turkey','80':'Austria',
+            '189':'Switzerland','308':'Portugal','330':'Romania'
+          }
+
+          def norm(s):
+              s=unicodedata.normalize('NFKD',s or '').encode('ascii','ignore').decode().lower()
+              s=s.replace('&',' and ').replace("'",'')
+              s=re.sub(r'\b(football club|futbol club|futebol clube|club de futbol|club|fc|cf|sc|ac|afc|rcd|rc|cd|ud|sv|vfb|vfl|calcio)\b',' ',s)
+              s=re.sub(r'\b(18|19|20)\d{2}\b',' ',s)
+              s=re.sub(r'[^a-z0-9]+',' ',s)
+              return re.sub(r'\s+',' ',s).strip()
+
+          def get(url,timeout=30):
+              req=urllib.request.Request(url,headers={
+                  'User-Agent':'Mozilla/5.0 ManagerCareer/1.0',
+                  'Accept':'application/json,text/plain,*/*'
+              })
+              with urllib.request.urlopen(req,timeout=timeout) as r:
+                  return r.read().decode('utf-8','replace')
+
+          # Reep supplies stable identity bridges, including Sofascore team ids + Wikidata ids.
+          teams_csv=get('https://raw.githubusercontent.com/withqwerty/reep/main/data/teams.csv',120)
+          rr=csv.DictReader(io.StringIO(teams_csv))
+          by_country={}
+          all_rows=[]
+          for row in rr:
+              name=(row.get('name') or '').strip()
+              if not name: continue
+              rec={
+                  'name':name,
+                  'norm':norm(name),
+                  'country':(row.get('country') or '').strip(),
+                  'sofascore':(row.get('key_sofascore') or '').strip(),
+                  'wikidata':(row.get('key_wikidata') or '').strip()
+              }
+              all_rows.append(rec)
+              by_country.setdefault(rec['country'],[]).append(rec)
+
+          manual_team_alias={
+            'Athletic Club':'Athletic Bilbao',
+            'Atlético Madrid':'Atlético Madrid',
+            'RC Celta':'Celta Vigo',
+            'RC Deportivo A Coruña':'Deportivo La Coruña',
+            'Real Sporting de Gijón':'Sporting Gijón',
+            'Racing Santander':'Racing Santander',
+            'FC København':'FC Copenhagen',
+            'Sønderjyske Fodbold':'Sonderjyske',
+            'Aarhus Gymnastikforening':'AGF',
+            'Odense Boldklub':'OB',
+            'Sporting Clube de Braga':'Braga',
+            'Vitória SC':'Vitória Guimarães',
+            'Grasshopper Club Zürich':'Grasshoppers',
+            'Asociația Clubul Sportiv Petrolul 52':'Petrolul Ploiesti',
+            'FK Bodø/Glimt':'Bodø/Glimt'
+          }
+
+          def score_name(a,b):
+              A,B=norm(a),norm(b)
+              if not A or not B:return 0
+              if A==B:return 1
+              if A in B or B in A:
+                  return .88+.1*min(len(A),len(B))/max(len(A),len(B))
+              return SequenceMatcher(None,A,B).ratio()
+
+          club_meta=[]
+          for lid,rows in data.get('leagues',{}).items():
+              country=league_country.get(lid,'')
+              for row in rows:
+                  club=row[0]
+                  target=manual_team_alias.get(club,club)
+                  pool=by_country.get(country,[]) or all_rows
+                  best=max(pool,key=lambda r:score_name(target,r['name']),default=None)
+                  sc=score_name(target,best['name']) if best else 0
+                  if sc<.70:
+                      # Retry globally only for difficult provider naming.
+                      best=max(all_rows,key=lambda r:score_name(target,r['name']),default=None)
+                      sc=score_name(target,best['name']) if best else 0
+                  club_meta.append({
+                      'club':club,'lid':lid,'country':country,'match':best,'score':sc
+                  })
+
+          # Current known override: Athletic announced Edin Terzic for 2026/27 through 2028.
+          overrides={'Athletic Club':'Edin Terzić'}
+
+          def sofascore_manager(meta):
+              club=meta['club']
+              if club in overrides:return club,overrides[club],'override'
+              rec=meta['match']
+              if not rec or meta['score']<.70 or not rec.get('sofascore'):
+                  return club,None,'no_team_id'
+              try:
+                  raw=get('https://www.sofascore.com/api/v1/team/'+urllib.parse.quote(rec['sofascore']),20)
+                  j=json.loads(raw)
+                  team=j.get('team',j)
+                  mgr=team.get('manager') if isinstance(team,dict) else None
+                  if isinstance(mgr,dict):
+                      name=(mgr.get('name') or mgr.get('shortName') or '').strip()
+                  else:
+                      name=(mgr or '').strip() if isinstance(mgr,str) else ''
+                  if name:return club,name,'sofascore'
+              except Exception:
+                  pass
+              return club,None,'sofascore_missing'
+
+          manager_map={}
+          source_map={}
+          unresolved=[]
+          with ThreadPoolExecutor(max_workers=6) as ex:
+              futs=[ex.submit(sofascore_manager,m) for m in club_meta]
+              for fut in as_completed(futs):
+                  club,name,src=fut.result()
+                  if name:
+                      manager_map[club]=name;source_map[club]=src
+                  else:
+                      unresolved.append(club)
+
+          # Wikidata fallback using the matched club's current head coach (P286).
+          missing_meta=[m for m in club_meta if m['club'] in unresolved and m['match'] and m['match'].get('wikidata')]
+          qid_by_club={m['club']:m['match']['wikidata'] for m in missing_meta}
+          qids=sorted(set(qid_by_club.values()))
+          coach_qid_by_team={}
+          for i in range(0,len(qids),40):
+              batch=qids[i:i+40]
+              try:
+                  url='https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=claims&ids='+urllib.parse.quote('|'.join(batch))
+                  ents=json.loads(get(url,30)).get('entities',{})
+                  for qid,obj in ents.items():
+                      claims=(obj.get('claims') or {}).get('P286') or []
+                      # Prefer statements without an end-time qualifier.
+                      active=[]
+                      for c in claims:
+                          quals=c.get('qualifiers') or {}
+                          if 'P582' not in quals and c.get('mainsnak',{}).get('datavalue'):
+                              active.append(c)
+                      use=(active or claims)
+                      if use:
+                          v=use[-1].get('mainsnak',{}).get('datavalue',{}).get('value',{})
+                          cq=v.get('id') if isinstance(v,dict) else None
+                          if cq:coach_qid_by_team[qid]=cq
+              except Exception:
+                  pass
+
+          coach_qids=sorted(set(coach_qid_by_team.values()))
+          coach_labels={}
+          for i in range(0,len(coach_qids),40):
+              batch=coach_qids[i:i+40]
+              try:
+                  url='https://www.wikidata.org/w/api.php?action=wbgetentities&format=json&props=labels&languages=en|es&ids='+urllib.parse.quote('|'.join(batch))
+                  ents=json.loads(get(url,30)).get('entities',{})
+                  for qid,obj in ents.items():
+                      labels=obj.get('labels') or {}
+                      lab=(labels.get('es') or labels.get('en') or {}).get('value')
+                      if lab:coach_labels[qid]=lab
+              except Exception:
+                  pass
+
+          for club,qid in qid_by_club.items():
+              if club in manager_map:continue
+              cq=coach_qid_by_team.get(qid)
+              name=coach_labels.get(cq)
+              if name:
+                  manager_map[club]=name;source_map[club]='wikidata'
+
+          # Never leave the UI blank; unresolved clubs use a neutral placeholder.
+          all_clubs=[m['club'] for m in club_meta]
+          unresolved=[c for c in all_clubs if c not in manager_map]
+          for c in unresolved:
+              manager_map[c]='Entrenador actual'
+              source_map[c]='fallback'
+
+          out={
+              'v':1,
+              'generated':'2026-10-01',
+              'count':len(manager_map),
+              'resolved':sum(1 for c in all_clubs if source_map.get(c)!='fallback'),
+              'fallback':sum(1 for c in all_clubs if source_map.get(c)=='fallback'),
+              'managers':manager_map
+          }
+          Path('manager-career/data/manager-map.json').write_text(
+              json.dumps(out,ensure_ascii=False,separators=(',',':')),encoding='utf-8'
+          )
+          print('clubs',len(all_clubs),'map',len(manager_map),'resolved',out['resolved'],'fallback',out['fallback'])
+          print('Athletic Club ->',manager_map.get('Athletic Club'))
+          if out['resolved']<250:
+              raise SystemExit('Too few real manager mappings; refusing weak build')
+          PY
+
+      - name: Commit manager map
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manager-career/data/manager-map.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Build current manager map for Manager Career"
+          git push
