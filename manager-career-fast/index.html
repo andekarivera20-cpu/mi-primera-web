@@ -90,6 +90,17 @@ const COACHES=['Ernesto Valverde','Pep Guardiola','Mikel Arteta','Arne Slot','R�
 const LOGO_COUNTRY={'España':'spain','Inglaterra':'england','Alemania':'germany','Italia':'italy','Francia':'france','Países Bajos':'netherlands','Portugal':'portugal','Bélgica':'belgium','Dinamarca':'denmark','Noruega':'norway','Escocia':'scotland','Suecia':'sweden','Irlanda':'ireland','Polonia':'poland','Turquía':'turkey','Austria':'austria','Suiza':'switzerland','Rumanía':'romania'};
 const LOGO_ALIASES={'Athletic Club':'Athletic Club Bilbao','Athletic Club de Bilbao':'Athletic Club Bilbao','Deportivo Alavés':'Deportivo Alavés','Deportivo Alaves':'Deportivo Alavés','FC Barcelona':'Barcelona','Real Madrid CF':'Real Madrid','Atlético de Madrid':'Atletico Madrid','Atlético Madrid':'Atletico Madrid','Real Sociedad de Fútbol':'Real Sociedad','Real Betis Balompié':'Real Betis','Villarreal CF':'Villarreal','Valencia CF':'Valencia','Sevilla FC':'Sevilla','RC Celta':'Celta Vigo','Celta de Vigo':'Celta Vigo','RCD Espanyol':'Espanyol','RCD Mallorca':'Mallorca','CA Osasuna':'Osasuna','Rayo Vallecano de Madrid':'Rayo Vallecano','Paris Saint-Germain':'PSG','Paris SG':'PSG','FC Bayern München':'Bayern Munich','Bayern München':'Bayern Munich','Internazionale':'Inter Milan','Inter':'Inter Milan','AC Milan':'Milan','Sporting CP':'Sporting Lisbon','SL Benfica':'Benfica','FC Porto':'Porto'};
 function initials(name){return String(name||'?').split(/\s+/).filter(Boolean).slice(0,3).map(x=>x[0]).join('').toUpperCase()}
+let EXACT_CRESTS_V90={};
+const CREST_MAP_V90_URL='../manager-career/data/crest-map.json?v=2';
+fetch(CREST_MAP_V90_URL,{cache:'force-cache'})
+  .then(r=>{if(!r.ok)throw new Error('crest map '+r.status);return r.json()})
+  .then(j=>{
+    EXACT_CRESTS_V90=j&&j.crests?j.crests:{};
+    document.querySelectorAll('img[data-crest-club]').forEach(img=>{delete img.dataset.ready});
+    hydrateCrests(document);
+  })
+  .catch(e=>console.warn('Crest map fallback',e));
+
 function logoCandidates(club,lid){const country=EURO_LEAGUES[lid]?.country||DB.clubs.get(club)?.leagueId&&EURO_LEAGUES[DB.clubs.get(club).leagueId]?.country||S?.country||'';const folder=LOGO_COUNTRY[country];if(!folder)return[];const names=[LOGO_ALIASES[club],club,club.replace(/\bFC\b/g,'').trim(),club.replace(/\bCF\b/g,'').trim()].filter(Boolean);return [...new Set(names)].map(n=>n.replace(/\s+/g,'_')).map(n=>`https://raw.githubusercontent.com/JoseArroyave/football-logos/refs/heads/main/logos/${encodeURIComponent(folder)}/${encodeURIComponent(n)}.svg`)}
 
 Object.assign(LOGO_ALIASES,{
@@ -111,6 +122,7 @@ function logoNameVariantsV89(club){
  return [...new Set([LOGO_ALIASES[raw],raw,noYears,stripPrefix,stripSuffix,simple,...replacements].filter(Boolean))];
 }
 function logoCandidates(club,lid){
+ const exact=EXACT_CRESTS_V90[club];
  const country=EURO_LEAGUES[lid]?.country||DB.clubs.get(club)?.leagueId&&EURO_LEAGUES[DB.clubs.get(club).leagueId]?.country||S?.country||'';
  const folder=LOGO_COUNTRY[country];if(!folder)return[];
  const files=[];
@@ -119,7 +131,8 @@ function logoCandidates(club,lid){
    const ascii=n.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
    if(ascii!==n)files.push(ascii.replace(/\s+/g,'_'));
  }
- return [...new Set(files)].map(n=>`https://raw.githubusercontent.com/JoseArroyave/football-logos/refs/heads/main/logos/${encodeURIComponent(folder)}/${encodeURIComponent(n)}.svg`)
+ const generated=[...new Set(files)].map(n=>`https://raw.githubusercontent.com/JoseArroyave/football-logos/refs/heads/main/logos/${encodeURIComponent(folder)}/${encodeURIComponent(n)}.svg`);
+ return exact?[exact,...generated]:generated
 }
 
 function crestMarkup(club,lid,cls=''){return `<span class="crest-fallback ${cls}">${esc(initials(club))}</span><img class="crest ${cls}" data-crest-club="${esc(club)}" data-crest-lid="${esc(lid||'')}" alt="Escudo de ${esc(club)}" hidden>`}
