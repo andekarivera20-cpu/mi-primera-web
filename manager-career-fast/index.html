@@ -908,7 +908,7 @@ loadDB=async function(){
 // Lightweight: no extra libraries, no player photos, no new remote data.
 (function(){
   const style=document.createElement('style');
-  style.textContent=\`
+  style.textContent=`
     .player-card[data-player-profile],tr[data-player-profile]{cursor:pointer}
     .player-card[data-player-profile]:active{transform:scale(.995)}
     tr[data-player-profile]:hover td{background:#12251b}
@@ -932,7 +932,7 @@ loadDB=async function(){
       .profile-head{grid-template-columns:auto minmax(0,1fr)}
       .profile-head>.profile-close{grid-column:1/-1;width:100%}
     }
-  \`;
+  `;
   document.head.appendChild(style);
 
   function trackOvrV91(p,label){
@@ -969,48 +969,48 @@ loadDB=async function(){
     const ga=(p.goals||0)+(p.assists||0);
     const contract=(p.contractUntil||'—');
     const clubLid=DB.clubs.get(p.club)?.leagueId||p.leagueId||S.leagueId;
-    els.matchBox.innerHTML=\`
+    els.matchBox.innerHTML=`
       <div class="profile-head">
-        \${crestMarkup(p.club,clubLid,'lg')}
+        ${crestMarkup(p.club,clubLid,'lg')}
         <div>
-          <h2 style="margin:0">\${esc(p.name)}</h2>
-          <div class="muted">\${esc(p.positions||'—')} · \${p.age||'—'} años · \${esc(p.nation||'—')} · \${esc(p.foot||'—')}</div>
+          <h2 style="margin:0">${esc(p.name)}</h2>
+          <div class="muted">${esc(p.positions||'—')} · ${p.age||'—'} años · ${esc(p.nation||'—')} · ${esc(p.foot||'—')}</div>
           <div class="profile-meta">
-            <span class="badge">\${esc(p.club||'Agente libre')}</span>
-            <span class="badge">\${esc(p.squadRole||p.hierarchy||'Plantilla')}</span>
-            <span class="badge">\${esc(statusText(p))}</span>
+            <span class="badge">${esc(p.club||'Agente libre')}</span>
+            <span class="badge">${esc(p.squadRole||p.hierarchy||'Plantilla')}</span>
+            <span class="badge">${esc(statusText(p))}</span>
           </div>
         </div>
-        <div class="profile-ovr" title="OVR">\${p.overall}</div>
+        <div class="profile-ovr" title="OVR">${p.overall}</div>
         <button class="btn ghost profile-close" id="closePlayerProfile">Cerrar</button>
       </div>
 
       <div class="profile-grid">
-        <div class="profile-kpi"><small>Potencial</small><strong>\${p.potential||'—'}</strong></div>
-        <div class="profile-kpi"><small>Valor</small><strong>\${euro(p.value||0)}</strong></div>
-        <div class="profile-kpi"><small>Salario</small><strong>\${euro(p.wage||0)}/sem</strong></div>
-        <div class="profile-kpi"><small>Contrato</small><strong>\${esc(contract)}</strong></div>
-        <div class="profile-kpi"><small>Partidos</small><strong>\${p.appearances||0}</strong></div>
-        <div class="profile-kpi"><small>Minutos</small><strong>\${p.minutes||0}</strong></div>
-        <div class="profile-kpi"><small>Goles + asist.</small><strong>\${ga}</strong></div>
-        <div class="profile-kpi"><small>Nota media</small><strong>\${avg}</strong></div>
-        <div class="profile-kpi"><small>Goles</small><strong>\${p.goals||0}</strong></div>
-        <div class="profile-kpi"><small>Asistencias</small><strong>\${p.assists||0}</strong></div>
-        <div class="profile-kpi"><small>Fitness</small><strong>\${Math.round(p.fitness||100)}%</strong></div>
-        <div class="profile-kpi"><small>Moral</small><strong>\${Math.round(p.morale||70)}%</strong></div>
+        <div class="profile-kpi"><small>Potencial</small><strong>${p.potential||'—'}</strong></div>
+        <div class="profile-kpi"><small>Valor</small><strong>${euro(p.value||0)}</strong></div>
+        <div class="profile-kpi"><small>Salario</small><strong>${euro(p.wage||0)}/sem</strong></div>
+        <div class="profile-kpi"><small>Contrato</small><strong>${esc(contract)}</strong></div>
+        <div class="profile-kpi"><small>Partidos</small><strong>${p.appearances||0}</strong></div>
+        <div class="profile-kpi"><small>Minutos</small><strong>${p.minutes||0}</strong></div>
+        <div class="profile-kpi"><small>Goles + asist.</small><strong>${ga}</strong></div>
+        <div class="profile-kpi"><small>Nota media</small><strong>${avg}</strong></div>
+        <div class="profile-kpi"><small>Goles</small><strong>${p.goals||0}</strong></div>
+        <div class="profile-kpi"><small>Asistencias</small><strong>${p.assists||0}</strong></div>
+        <div class="profile-kpi"><small>Fitness</small><strong>${Math.round(p.fitness||100)}%</strong></div>
+        <div class="profile-kpi"><small>Moral</small><strong>${Math.round(p.morale||70)}%</strong></div>
       </div>
 
       <div class="profile-section">
         <h3>Últimos 5 partidos</h3>
-        <div class="last5">\${last.length?last.map(n=>'<span>'+Number(n).toFixed(1)+'</span>').join(''):'<span class="muted" style="min-width:auto">Aún no tiene notas registradas</span>'}</div>
+        <div class="last5">${last.length?last.map(n=>'<span>'+Number(n).toFixed(1)+'</span>').join(''):'<span class="muted" style="min-width:auto">Aún no tiene notas registradas</span>'}</div>
       </div>
 
       <div class="profile-section">
         <h3>Evolución de OVR</h3>
-        \${chartV91(p)}
+        ${chartV91(p)}
         <div class="muted" style="margin-top:6px">Se guarda un punto por temporada y solo los últimos 8 para mantener la partida ligera.</div>
       </div>
-    \`;
+    `;
     els.matchModal.classList.remove('hidden');
     hydrateCrests(els.matchBox);
     $('#closePlayerProfile').onclick=()=>els.matchModal.classList.add('hidden');
