@@ -91,6 +91,37 @@ const LOGO_COUNTRY={'España':'spain','Inglaterra':'england','Alemania':'germany
 const LOGO_ALIASES={'Athletic Club':'Athletic Club Bilbao','Athletic Club de Bilbao':'Athletic Club Bilbao','Deportivo Alavés':'Deportivo Alavés','Deportivo Alaves':'Deportivo Alavés','FC Barcelona':'Barcelona','Real Madrid CF':'Real Madrid','Atlético de Madrid':'Atletico Madrid','Atlético Madrid':'Atletico Madrid','Real Sociedad de Fútbol':'Real Sociedad','Real Betis Balompié':'Real Betis','Villarreal CF':'Villarreal','Valencia CF':'Valencia','Sevilla FC':'Sevilla','RC Celta':'Celta Vigo','Celta de Vigo':'Celta Vigo','RCD Espanyol':'Espanyol','RCD Mallorca':'Mallorca','CA Osasuna':'Osasuna','Rayo Vallecano de Madrid':'Rayo Vallecano','Paris Saint-Germain':'PSG','Paris SG':'PSG','FC Bayern München':'Bayern Munich','Bayern München':'Bayern Munich','Internazionale':'Inter Milan','Inter':'Inter Milan','AC Milan':'Milan','Sporting CP':'Sporting Lisbon','SL Benfica':'Benfica','FC Porto':'Porto'};
 function initials(name){return String(name||'?').split(/\s+/).filter(Boolean).slice(0,3).map(x=>x[0]).join('').toUpperCase()}
 function logoCandidates(club,lid){const country=EURO_LEAGUES[lid]?.country||DB.clubs.get(club)?.leagueId&&EURO_LEAGUES[DB.clubs.get(club).leagueId]?.country||S?.country||'';const folder=LOGO_COUNTRY[country];if(!folder)return[];const names=[LOGO_ALIASES[club],club,club.replace(/\bFC\b/g,'').trim(),club.replace(/\bCF\b/g,'').trim()].filter(Boolean);return [...new Set(names)].map(n=>n.replace(/\s+/g,'_')).map(n=>`https://raw.githubusercontent.com/JoseArroyave/football-logos/refs/heads/main/logos/${encodeURIComponent(folder)}/${encodeURIComponent(n)}.svg`)}
+
+Object.assign(LOGO_ALIASES,{
+'RC Celta':'Celta','Celta de Vigo':'Celta','Girona FC':'Girona','Real Oviedo':'Oviedo','Racing Santander':'Racing Santander','RC Deportivo A Coruña':'Deportivo La Coruña','Real Sporting de Gijón':'Sporting Gijón','CD Castellón':'Castellón','Córdoba CF':'Córdoba','UD Almería':'Almería','UD Las Palmas':'Las Palmas','Real Valladolid CF':'Real Valladolid','SD Eibar':'Eibar','Málaga CF':'Málaga',
+'AFC Bournemouth':'Bournemouth','Arsenal FC':'Arsenal','Brighton & Hove Albion':'Brighton','Chelsea FC':'Chelsea','Everton FC':'Everton','Fulham FC':'Fulham','Liverpool FC':'Liverpool','Sunderland AFC':'Sunderland','Ipswich Town':'Ipswich','Leicester City':'Leicester','Middlesbrough FC':'Middlesbrough','Southampton FC':'Southampton',
+'Olympique de Marseille':'Marseille','OGC Nice':'Nice','AJ Auxerre':'Auxerre','Angers SCO':'Angers','FC Lorient':'Lorient FC','Lille OSC':'Lille','Stade Brestois 29':'Brest','Stade Rennais':'Rennes','Toulouse FC':'Toulouse','En Avant Guingamp':'EA Guingamp','ESTAC Troyes':'Troyes','USL Dunkerque':'Dunkerque','Stade de Reims':'Reims',
+'1. FC Köln':'Cologne','FC Augsburg':'Augsburg','FC St. Pauli':'St Pauli','SC Freiburg':'Freiburg','TSG 1899 Hoffenheim':'Hoffenheim','1. FSV Mainz 05':'Mainz 05','1. FC Heidenheim 1846':'FC Heidenheim','SC Paderborn 07':'SC Paderborn','1. FC Nürnberg':'FC Nürnberg','1. FC Kaiserslautern':'FC Kaiserslautern','DSC Arminia Bielefeld':'Arminia Bielefeld','SC Preußen Münster':'Preußen Münster','VfL Bochum 1848':'VfL Bochum',
+'Internazionale':'Inter','Inter':'Inter','Inter Milan':'Inter','Bologna FC':'Bologna','Como':'Como 1907','Hellas Verona FC':'Hellas Verona','Juventus FC':'Juventus','Parma Calcio':'Parma','Torino FC':'Torino','Udinese Calcio':'Udinese','Palermo FC':'Palermo','SS Juve Stabia':'Juve Stabia','Venezia FC':'Venezia','Calcio Padova':'Padova',
+'Excelsior':'Excelsior Rotterdam','FC Twente':'Twente','NEC Nijmegen':'N.E.C. Nijmegen','PSV':'PSV Eindhoven','SC Heerenveen':'sc Heerenveen',
+'Sporting CP':'Sporting CP','Sporting Clube de Braga':'SC Braga','SL Benfica':'Benfica','FC Porto':'FC Porto','GD Estoril Praia':'Estoril','FC Arouca':'Arouca','Famalicão':'Famalicao','Gil Vicente FC':'Gil Vicente','Moreirense FC':'Moreirense','Rio Ave FC':'Rio Ave','CD Nacional':'Nacional da Madeira','Vitória SC':'Vitória de Guimarães'
+});
+function logoNameVariantsV89(club){
+ const raw=String(club||'').trim();
+ const noYears=raw.replace(/\b(18|19|20)\d{2}\b/g,'').replace(/\s+/g,' ').trim();
+ const stripPrefix=noYears.replace(/^(AFC|AC|AS|CA|CD|CF|FC|GD|RC|RCD|SC|SD|SL|SS|SV|TSG|UD|US|VfB|VfL)\.?\s+/i,'').trim();
+ const stripSuffix=noYears.replace(/\s+(AFC|AC|CF|FC|SC|SAD)$/i,'').trim();
+ const simple=noYears.replace(/\b(AFC|AC|AS|CA|CD|CF|FC|GD|RC|RCD|SC|SD|SL|SS|SV|TSG|UD|US|VfB|VfL)\b\.?/gi,' ').replace(/\s+/g,' ').trim();
+ const replacements=[raw.replace(/Balompié/gi,'').trim(),raw.replace(/Calcio/gi,'').trim(),raw.replace(/Olympique de /i,'').replace(/Olympique /i,'').trim(),raw.replace(/^Stade\s+/i,'').trim(),raw.replace(/^Real\s+/i,'').trim()];
+ return [...new Set([LOGO_ALIASES[raw],raw,noYears,stripPrefix,stripSuffix,simple,...replacements].filter(Boolean))];
+}
+function logoCandidates(club,lid){
+ const country=EURO_LEAGUES[lid]?.country||DB.clubs.get(club)?.leagueId&&EURO_LEAGUES[DB.clubs.get(club).leagueId]?.country||S?.country||'';
+ const folder=LOGO_COUNTRY[country];if(!folder)return[];
+ const files=[];
+ for(const n of logoNameVariantsV89(club)){
+   files.push(n.replace(/\s+/g,'_'));
+   const ascii=n.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+   if(ascii!==n)files.push(ascii.replace(/\s+/g,'_'));
+ }
+ return [...new Set(files)].map(n=>`https://raw.githubusercontent.com/JoseArroyave/football-logos/refs/heads/main/logos/${encodeURIComponent(folder)}/${encodeURIComponent(n)}.svg`)
+}
+
 function crestMarkup(club,lid,cls=''){return `<span class="crest-fallback ${cls}">${esc(initials(club))}</span><img class="crest ${cls}" data-crest-club="${esc(club)}" data-crest-lid="${esc(lid||'')}" alt="Escudo de ${esc(club)}" hidden>`}
 function hydrateCrests(root=document){root.querySelectorAll('img[data-crest-club]').forEach(img=>{if(img.dataset.ready)return;img.dataset.ready='1';const club=img.dataset.crestClub,lid=img.dataset.crestLid||DB.clubs.get(club)?.leagueId||S?.leagueId||'';const urls=logoCandidates(club,lid);let i=0;const fallback=img.previousElementSibling;const tryNext=()=>{if(i>=urls.length){img.hidden=true;if(fallback)fallback.style.display='inline-grid';return}img.src=urls[i++];};img.onload=()=>{img.hidden=false;if(fallback)fallback.style.display='none'};img.onerror=tryNext;tryNext()})}
 function updateTeamPreview(){const club=els.team.value,lid=els.league.value;if(!club){els.teamPreview.classList.add('hidden');els.teamPreview.innerHTML='';return}els.teamPreview.classList.remove('hidden');const rating=clubRatingDB(club).toFixed(1),budget=budgetFor(club);els.teamPreview.innerHTML=`${crestMarkup(club,lid,'lg')}<div><strong style="font-size:18px">${esc(club)}</strong><div class="muted">${esc(EURO_LEAGUES[lid]?.name||'')} · media XI ${rating} · presupuesto aprox. ${euro(budget)}</div></div>`;hydrateCrests(els.teamPreview)}
