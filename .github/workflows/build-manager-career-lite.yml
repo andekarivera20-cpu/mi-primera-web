@@ -2,8 +2,7 @@ name: Build Manager Career Lite Data
 
 on:
   push:
-    paths:
-      - '.github/workflows/build-manager-career-lite.yml'
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -120,3 +119,5 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "Build compact FC27 data for Manager Career"
           git push
+
+# retrigger 2026-10-01
