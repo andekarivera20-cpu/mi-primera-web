@@ -19,7 +19,7 @@ jobs:
       - name: Fill current manager map safely
         run: |
           python - <<'PY'
-          import csv, io, json, re, unicodedata, urllib.request, urllib.parse, html as htmlmod
+          import csv, io, json, re, time, unicodedata, urllib.request, urllib.parse, html as htmlmod
           from difflib import SequenceMatcher
           from concurrent.futures import ThreadPoolExecutor, as_completed
           from pathlib import Path
@@ -76,6 +76,44 @@ jobs:
                   c=row[0]
                   all_clubs.append(c)
                   club_country[c]=league_country.get(lid,'')
+
+          missing=[c for c in all_clubs if c not in managers]
+
+          # Small targeted SofaScore pass only for unresolved clubs.
+          def direct_manager(club):
+              target=club
+              for attempt in range(2):
+                  try:
+                      url='https://www.sofascore.com/api/v1/search/all?q='+urllib.parse.quote(target)
+                      j=json.loads(get(url,25))
+                      items=j if isinstance(j,list) else (j.get('results') or j.get('entities') or [])
+                      best=None;best_sc=0
+                      for item in items:
+                          ent=item.get('entity',item) if isinstance(item,dict) else {}
+                          if not isinstance(ent,dict):continue
+                          typ=(item.get('type') if isinstance(item,dict) else '') or ent.get('type') or ''
+                          if typ and str(typ).lower() not in {'team','club'}:continue
+                          tid=ent.get('id');nm=ent.get('name') or ''
+                          if not tid or not nm:continue
+                          sc=score(target,nm)
+                          if sc>best_sc:best=(tid,nm);best_sc=sc
+                      if best and best_sc>=.62:
+                          raw=get('https://www.sofascore.com/api/v1/team/'+str(best[0]),25)
+                          tj=json.loads(raw);team=tj.get('team',tj)
+                          if isinstance(team,dict) and score(target,team.get('name') or best[1])>=.58:
+                              mgr=team.get('manager')
+                              name=(mgr.get('name') or mgr.get('shortName') or '').strip() if isinstance(mgr,dict) else ((mgr or '').strip() if isinstance(mgr,str) else '')
+                              if name:return club,name
+                  except Exception:
+                      time.sleep(.8+attempt*.8)
+              return club,None
+
+          if missing:
+              with ThreadPoolExecutor(max_workers=2) as ex:
+                  futs=[ex.submit(direct_manager,c) for c in missing]
+                  for fut in as_completed(futs):
+                      club,name=fut.result()
+                      if name:managers[club]=name
 
           missing=[c for c in all_clubs if c not in managers]
 
@@ -200,3 +238,5 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "Complete current manager map"
           git push
+
+# targeted unresolved-manager refresh
