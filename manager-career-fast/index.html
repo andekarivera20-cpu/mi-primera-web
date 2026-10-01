@@ -1050,6 +1050,153 @@ loadDB=async function(){
   };
 })();
 
+
+// ===== TACTICAL ROLES + CREST CALENDAR 9.2 =====
+(function(){
+  const style=document.createElement('style');
+  style.textContent=`
+    .role-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+    .role-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(150px,.7fr);gap:8px;align-items:center;background:#0a1510;border:1px solid var(--line);border-radius:11px;padding:8px 10px}
+    .role-row small{display:block;color:var(--muted);margin-top:2px}
+    .role-row select{min-width:0}
+    .cal-opp{display:flex;align-items:center;gap:4px;margin-top:5px;min-width:0}
+    .cal-opp .crest,.cal-opp .crest-fallback{width:18px;height:18px;min-width:18px;font-size:7px}
+    .cal-opp span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .fixture-with-crests{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+    .fixture-rival{display:flex;align-items:center;gap:7px;min-width:0}
+    .fixture-rival .crest,.fixture-rival .crest-fallback{width:27px;height:27px;min-width:27px;font-size:8px}
+    @media(max-width:680px){.role-grid{grid-template-columns:1fr}.role-row{grid-template-columns:1fr}.cal-opp span{font-size:9px}}
+  `;
+  document.head.appendChild(style);
+
+  const ROLE_OPTIONS_V92={
+    GK:['Tradicional','Portero líbero'],
+    CB:['Conservador','Sacar balón'],
+    LB:['No subir','Equilibrado','Subir'],
+    RB:['No subir','Equilibrado','Subir'],
+    CDM:['Ancla','Organizador','Equilibrado'],
+    CM:['Organizador','Box to box','Equilibrado'],
+    CAM:['Organizador','Llegador','Libre'],
+    LM:['Abrirse','Meterse por dentro','Ayudar atrás'],
+    RM:['Abrirse','Meterse por dentro','Ayudar atrás'],
+    LW:['Abrirse','Meterse por dentro','Ayudar atrás'],
+    RW:['Abrirse','Meterse por dentro','Ayudar atrás'],
+    ST:['Hombre objetivo','Atacar espacios','Falso 9'],
+    CF:['Hombre objetivo','Atacar espacios','Falso 9']
+  };
+  function roleOptionsV92(pos){return ROLE_OPTIONS_V92[pos]||['Equilibrado']}
+  function defaultRoleV92(pos){
+    if(pos==='GK')return'Tradicional';
+    if(pos==='CB')return'Conservador';
+    if(pos==='LB'||pos==='RB')return'Equilibrado';
+    if(pos==='CDM')return'Ancla';
+    if(pos==='CM')return'Equilibrado';
+    if(pos==='CAM')return'Organizador';
+    if(['LW','RW','LM','RM'].includes(pos))return'Abrirse';
+    if(pos==='ST'||pos==='CF')return'Atacar espacios';
+    return'Equilibrado';
+  }
+  function roleForV92(p,pos){
+    const opts=roleOptionsV92(pos);
+    return p&&opts.includes(p.tacticalRole)?p.tacticalRole:defaultRoleV92(pos);
+  }
+  function roleImpactV92(){
+    const form=FORMATIONS[S.formation]||[],fx={attack:0,control:0,defense:0,fatigue:0};
+    S.lineup.forEach((id,i)=>{
+      const p=S.players.find(x=>x.id===id),pos=form[i]?.p||'',r=roleForV92(p,pos);
+      if(r==='Atacar espacios'){fx.attack+=.55;fx.fatigue+=.05}
+      else if(r==='Falso 9'){fx.control+=.55;fx.attack+=.12}
+      else if(r==='Hombre objetivo'){fx.attack+=.28}
+      else if(r==='Meterse por dentro'){fx.attack+=.38;fx.control+=.12}
+      else if(r==='Abrirse'){fx.attack+=.18;fx.control+=.16}
+      else if(r==='Ayudar atrás'){fx.defense+=.42;fx.attack-=.12}
+      else if(r==='Subir'){fx.attack+=.32;fx.fatigue+=.06;fx.defense-=.12}
+      else if(r==='No subir'){fx.defense+=.38;fx.attack-=.08}
+      else if(r==='Organizador'){fx.control+=.36}
+      else if(r==='Box to box'){fx.attack+=.18;fx.defense+=.18;fx.fatigue+=.05}
+      else if(r==='Ancla'){fx.defense+=.42}
+      else if(r==='Llegador'){fx.attack+=.36;fx.fatigue+=.03}
+      else if(r==='Libre'){fx.attack+=.2;fx.control+=.22}
+      else if(r==='Sacar balón'){fx.control+=.2;fx.defense+=.08}
+      else if(r==='Conservador'){fx.defense+=.22}
+      else if(r==='Portero líbero'){fx.control+=.12;fx.defense+=.1}
+    });
+    return fx;
+  }
+
+  const renderTacticsV92Base=renderTactics;
+  renderTactics=function(){
+    renderTacticsV92Base();
+    const form=FORMATIONS[S.formation]||[];
+    const psById=new Map(S.players.map(p=>[p.id,p]));
+    const box=document.createElement('div');
+    box.className='card';
+    box.style.marginTop='14px';
+    box.innerHTML='<div class="row"><h3 style="margin:0">Roles individuales</h3><span class="spacer"></span><span class="badge">Afectan al partido</span></div><div class="role-grid">'+
+      S.lineup.map((id,i)=>{
+        const p=psById.get(id),pos=form[i]?.p||'',opts=roleOptionsV92(pos),curRole=roleForV92(p,pos);
+        return '<div class="role-row"><div><strong>'+esc(p?.name||'Vacío')+'</strong><small>'+esc(pos)+' · '+esc(curRole)+'</small></div><select class="roleSelV92" data-id="'+esc(id||'')+'" data-pos="'+esc(pos)+'">'+opts.map(r=>'<option '+(r===curRole?'selected':'')+'>'+esc(r)+'</option>').join('')+'</select></div>';
+      }).join('')+'</div><p class="muted" style="margin-bottom:0">Los roles modifican ligeramente ataque, control, defensa y desgaste; no sustituyen al OVR ni a la forma del jugador.</p>';
+    els.view.appendChild(box);
+    box.querySelectorAll('.roleSelV92').forEach(sel=>sel.onchange=()=>{
+      const p=S.players.find(x=>String(x.id)===String(sel.dataset.id));
+      if(p){p.tacticalRole=sel.value;save();render('tactics')}
+    });
+  };
+
+  const simulateChanceV92Base=simulateChance;
+  simulateChance=function(M){
+    const before={hg:M.hg,ag:M.ag,myXG:M.myXG||0,oppXG:M.oppXG||0,momentum:M.momentum};
+    const fx=roleImpactV92();
+    M.momentum=clamp((M.momentum||50)+fx.control*.7+fx.defense*.25,14,86);
+    simulateChanceV92Base(M);
+    if((M.myXG||0)>before.myXG){
+      const delta=(M.myXG||0)-before.myXG;
+      M.myXG=before.myXG+delta*(1+clamp(fx.attack*.025,0,.16));
+    }
+    if((M.oppXG||0)>before.oppXG){
+      const delta=(M.oppXG||0)-before.oppXG;
+      M.oppXG=before.oppXG+delta*(1-clamp(fx.defense*.022,0,.14));
+    }
+    const scored=(M.home?M.hg:M.ag)>(M.home?before.hg:before.ag);
+    if(scored&&fx.attack>1.2&&Math.random()<.12){
+      M.events.push({text:"🧠 Los roles ofensivos generan superioridad en la jugada del gol."});
+    }
+  };
+
+  const advanceMatchV92Base=advanceMatch;
+  advanceMatch=function(M,mins){
+    const before=M.minute;
+    advanceMatchV92Base(M,mins);
+    const played=Math.max(0,M.minute-before),fx=roleImpactV92();
+    if(played>0&&fx.fatigue>0){
+      const extra=fx.fatigue*(played/15);
+      S.lineup.forEach(id=>{const p=S.players.find(x=>x.id===id);if(p)p.fitness=clamp((p.fitness||100)-extra,38,100)});
+    }
+  };
+
+  renderCalendar=function(){
+    ensureAdvanceState();
+    const all=fixturesAll(),month=calendarViewMonth||S.date.slice(0,7),start=new Date(month+'-01T12:00:00Z'),y=start.getUTCFullYear(),m=start.getUTCMonth(),days=new Date(Date.UTC(y,m+1,0)).getUTCDate(),first=(start.getUTCDay()+6)%7;
+    let cells='';for(let i=0;i<first;i++)cells+='<div></div>';
+    for(let d=1;d<=days;d++){
+      const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const fs=all.filter(f=>!f.conditional&&f.date===ds&&(f.home===S.club||f.away===S.club));
+      const extras=[];
+      if(isScheduledTrainingDay(ds))extras.push('🏋️ Entrenamiento');
+      const md=ds.slice(5);if(md==='07-01'||md==='01-01')extras.push('🪟 Abre mercado');if(md==='08-31'||md==='01-31')extras.push('🪟 Cierra mercado');
+      cells+=`<div class="calday ${fs.length||extras.length?'match':''} ${ds===S.date?'today-mark':''}"><strong>${d}</strong>${fs.slice(0,2).map(f=>{const opp=f.home===S.club?f.away:f.home,lid=DB.clubs.get(opp)?.leagueId||S.leagueId;return `<div class="m"><small>${esc(f.comp)}</small><div class="cal-opp">${crestMarkup(opp,lid,'')}<span>${esc(opp)}</span></div>${f.played?`<b>${f.home===S.club?f.hg+'-'+f.ag:f.ag+'-'+f.hg}</b>`:''}</div>`}).join('')}${extras.slice(0,2).map(x=>`<div class="m">${esc(x)}</div>`).join('')}</div>`;
+    }
+    const mine=all.filter(f=>(f.home===S.club||f.away===S.club)&&!f.conditional);
+    const agenda=[];for(let i=0;i<18;i++){const ds=isoAdd(S.date,i),fs=mine.filter(f=>f.date===ds),h=[];if(isScheduledTrainingDay(ds))h.push('🏋️ Entrenamiento');agenda.push({date:ds,fs,h})}
+    els.view.innerHTML=`<div class="row"><h2>Calendario · ${dateStr(month+'-01').replace('01 ','')}</h2><span class="spacer"></span><button class="btn ghost" id="prevM">←</button><button class="btn ghost" id="nextM">→</button></div>${advancePanelHTML()}<div class="calendar desktop-calendar">${['L','M','X','J','V','S','D'].map(x=>`<div class="muted" style="text-align:center">${x}</div>`).join('')}${cells}</div><div class="mobile-fixture-list"><div class="card"><h3>Próximos días</h3>${agenda.map(a=>`<div class="agenda-day ${a.date===S.date?'today-mark':''}"><div class="agenda-date">${a.date===S.date?'HOY':dateStr(a.date).split(' ').slice(0,2).join(' ')}</div><div class="agenda-items">${a.fs.map(f=>{const opp=f.home===S.club?f.away:f.home,lid=DB.clubs.get(opp)?.leagueId||S.leagueId;return `<div class="agenda-chip cal-opp">${crestMarkup(opp,lid,'')}<span>${esc(f.comp)} · ${esc(opp)}</span></div>`}).join('')}${a.h.map(x=>`<div class="agenda-chip">${esc(x)}</div>`).join('')}${!a.fs.length&&!a.h.length?'<span class="muted">Sin eventos</span>':''}</div></div>`).join('')}</div></div><div class="sep"></div><h3>Próximos partidos</h3>${mine.filter(f=>!f.played).slice(0,10).map(f=>{const opp=f.home===S.club?f.away:f.home,lid=DB.clubs.get(opp)?.leagueId||S.leagueId;return `<div class="fixture fixture-with-crests"><div><span class="comp ${f.comp==='Pretemporada'?'preseason':''}">${esc(f.comp)}</span> ${dateStr(f.date)}<div class="fixture-rival">${crestMarkup(opp,lid,'')}<strong>${esc(opp)}</strong><span class="muted">· ${f.home===S.club?'Local':'Visitante'}</span></div></div><strong>VS</strong></div>`}).join('')||'<div class="empty">No hay próximos partidos.</div>'}`;
+    hydrateCrests(els.view);
+    bindAdvanceControls(els.view);els.view.querySelectorAll('.goCalendar').forEach(b=>b.style.display='none');
+    $('#prevM').onclick=()=>{calendarViewMonth=new Date(Date.UTC(y,m-1,1)).toISOString().slice(0,7);render('calendar')};
+    $('#nextM').onclick=()=>{calendarViewMonth=new Date(Date.UTC(y,m+1,1)).toISOString().slice(0,7);render('calendar')};
+  };
+})();
+
 loadDB();
 })();
 </script>
