@@ -903,6 +903,154 @@ loadDB=async function(){
   setTimeout(async()=>{try{if(await cleanIDBGet(CLEAN_SAVE_KEY))els.continueBtn.classList.remove('hidden')}catch(e){}},0);
 };
 
+
+// ===== PLAYER PROFILE LITE 9.1 =====
+// Lightweight: no extra libraries, no player photos, no new remote data.
+(function(){
+  const style=document.createElement('style');
+  style.textContent=\`
+    .player-card[data-player-profile],tr[data-player-profile]{cursor:pointer}
+    .player-card[data-player-profile]:active{transform:scale(.995)}
+    tr[data-player-profile]:hover td{background:#12251b}
+    .profile-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center}
+    .profile-ovr{width:58px;height:58px;border-radius:15px;display:grid;place-items:center;background:#1b3324;font-size:24px;font-weight:950}
+    .profile-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+    .profile-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:14px}
+    .profile-kpi{background:#0a1510;border:1px solid var(--line);border-radius:11px;padding:9px;min-width:0}
+    .profile-kpi small{display:block;color:var(--muted);font-size:10px;text-transform:uppercase}
+    .profile-kpi strong{display:block;margin-top:3px;overflow:hidden;text-overflow:ellipsis}
+    .profile-section{margin-top:16px}
+    .last5{display:flex;gap:7px;flex-wrap:wrap}
+    .last5 span{min-width:45px;text-align:center;padding:7px 8px;border:1px solid var(--line);border-radius:9px;background:#0b1711;font-weight:850}
+    .ovr-chart{width:100%;height:145px;display:block;background:#08120d;border:1px solid var(--line);border-radius:12px}
+    .ovr-axis{stroke:#294235;stroke-width:1}
+    .ovr-line{fill:none;stroke:var(--accent);stroke-width:3}
+    .ovr-dot{fill:var(--accent2);stroke:#07110d;stroke-width:2}
+    .ovr-label{fill:#9eb1a5;font-size:9px}
+    @media(max-width:680px){
+      .profile-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .profile-head{grid-template-columns:auto minmax(0,1fr)}
+      .profile-head>.profile-close{grid-column:1/-1;width:100%}
+    }
+  \`;
+  document.head.appendChild(style);
+
+  function trackOvrV91(p,label){
+    if(!p)return;
+    const key=label||S?.season||'Actual';
+    p.ovrHistory=Array.isArray(p.ovrHistory)?p.ovrHistory:[];
+    const last=p.ovrHistory[p.ovrHistory.length-1];
+    if(last&&last.season===key) last.overall=p.overall;
+    else p.ovrHistory.push({season:key,overall:p.overall});
+    if(p.ovrHistory.length>8)p.ovrHistory=p.ovrHistory.slice(-8);
+  }
+
+  function chartV91(p){
+    trackOvrV91(p);
+    const h=(p.ovrHistory||[]).slice(-8);
+    if(!h.length)return '<div class="empty">Todavía no hay evolución registrada.</div>';
+    const W=520,H=140,L=34,R=18,T=16,B=28;
+    let vals=h.map(x=>Number(x.overall)||0);
+    let min=Math.max(40,Math.min(...vals)-2),max=Math.min(99,Math.max(...vals)+2);
+    if(max-min<4){min=Math.max(40,min-2);max=Math.min(99,max+2)}
+    const x=i=>h.length===1?(L+(W-R-L)/2):L+i*(W-L-R)/(h.length-1);
+    const y=v=>T+(max-v)*(H-T-B)/Math.max(1,max-min);
+    const points=h.map((d,i)=>x(i)+','+y(d.overall)).join(' ');
+    const dots=h.map((d,i)=>'<circle class="ovr-dot" cx="'+x(i)+'" cy="'+y(d.overall)+'" r="4"></circle><text class="ovr-label" x="'+x(i)+'" y="'+(H-8)+'" text-anchor="middle">'+esc(String(d.season).slice(0,7))+'</text><text class="ovr-label" x="'+x(i)+'" y="'+(y(d.overall)-8)+'" text-anchor="middle">'+d.overall+'</text>').join('');
+    return '<svg class="ovr-chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Evolución de media"><line class="ovr-axis" x1="'+L+'" y1="'+(H-B)+'" x2="'+(W-R)+'" y2="'+(H-B)+'"></line><polyline class="ovr-line" points="'+points+'"></polyline>'+dots+'</svg>';
+  }
+
+  function openPlayerProfileV91(id){
+    const p=S?.players?.find(x=>String(x.id)===String(id));
+    if(!p)return;
+    trackOvrV91(p);
+    const last=(p.recentRatings||[]).slice(-5);
+    const avg=p.avgRating?Number(p.avgRating).toFixed(1):'—';
+    const ga=(p.goals||0)+(p.assists||0);
+    const contract=(p.contractUntil||'—');
+    const clubLid=DB.clubs.get(p.club)?.leagueId||p.leagueId||S.leagueId;
+    els.matchBox.innerHTML=\`
+      <div class="profile-head">
+        \${crestMarkup(p.club,clubLid,'lg')}
+        <div>
+          <h2 style="margin:0">\${esc(p.name)}</h2>
+          <div class="muted">\${esc(p.positions||'—')} · \${p.age||'—'} años · \${esc(p.nation||'—')} · \${esc(p.foot||'—')}</div>
+          <div class="profile-meta">
+            <span class="badge">\${esc(p.club||'Agente libre')}</span>
+            <span class="badge">\${esc(p.squadRole||p.hierarchy||'Plantilla')}</span>
+            <span class="badge">\${esc(statusText(p))}</span>
+          </div>
+        </div>
+        <div class="profile-ovr" title="OVR">\${p.overall}</div>
+        <button class="btn ghost profile-close" id="closePlayerProfile">Cerrar</button>
+      </div>
+
+      <div class="profile-grid">
+        <div class="profile-kpi"><small>Potencial</small><strong>\${p.potential||'—'}</strong></div>
+        <div class="profile-kpi"><small>Valor</small><strong>\${euro(p.value||0)}</strong></div>
+        <div class="profile-kpi"><small>Salario</small><strong>\${euro(p.wage||0)}/sem</strong></div>
+        <div class="profile-kpi"><small>Contrato</small><strong>\${esc(contract)}</strong></div>
+        <div class="profile-kpi"><small>Partidos</small><strong>\${p.appearances||0}</strong></div>
+        <div class="profile-kpi"><small>Minutos</small><strong>\${p.minutes||0}</strong></div>
+        <div class="profile-kpi"><small>Goles + asist.</small><strong>\${ga}</strong></div>
+        <div class="profile-kpi"><small>Nota media</small><strong>\${avg}</strong></div>
+        <div class="profile-kpi"><small>Goles</small><strong>\${p.goals||0}</strong></div>
+        <div class="profile-kpi"><small>Asistencias</small><strong>\${p.assists||0}</strong></div>
+        <div class="profile-kpi"><small>Fitness</small><strong>\${Math.round(p.fitness||100)}%</strong></div>
+        <div class="profile-kpi"><small>Moral</small><strong>\${Math.round(p.morale||70)}%</strong></div>
+      </div>
+
+      <div class="profile-section">
+        <h3>Últimos 5 partidos</h3>
+        <div class="last5">\${last.length?last.map(n=>'<span>'+Number(n).toFixed(1)+'</span>').join(''):'<span class="muted" style="min-width:auto">Aún no tiene notas registradas</span>'}</div>
+      </div>
+
+      <div class="profile-section">
+        <h3>Evolución de OVR</h3>
+        \${chartV91(p)}
+        <div class="muted" style="margin-top:6px">Se guarda un punto por temporada y solo los últimos 8 para mantener la partida ligera.</div>
+      </div>
+    \`;
+    els.matchModal.classList.remove('hidden');
+    hydrateCrests(els.matchBox);
+    $('#closePlayerProfile').onclick=()=>els.matchModal.classList.add('hidden');
+    save();
+  }
+  window.openPlayerProfileV91=openPlayerProfileV91;
+
+  const renderSquadV91Base=renderSquad;
+  renderSquad=function(){
+    renderSquadV91Base();
+    const ps=getClubPlayers(S.club).sort((a,b)=>b.overall-a.overall);
+    const cards=[...els.view.querySelectorAll('.mobile-cards .player-card')];
+    const rows=[...els.view.querySelectorAll('.tablewrap tbody tr')];
+    ps.forEach((p,i)=>{
+      trackOvrV91(p);
+      const bind=node=>{
+        if(!node)return;
+        node.dataset.playerProfile=p.id;
+        node.tabIndex=0;
+        node.setAttribute('role','button');
+        node.setAttribute('aria-label','Abrir ficha de '+p.name);
+        node.addEventListener('click',()=>openPlayerProfileV91(p.id));
+        node.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openPlayerProfileV91(p.id)}});
+      };
+      bind(cards[i]);bind(rows[i]);
+    });
+  };
+
+  const seasonEndV91Base=seasonEnd;
+  seasonEnd=function(){
+    if(S?.players)S.players.forEach(p=>trackOvrV91(p,S.season));
+    const oldSeason=S?.season;
+    seasonEndV91Base();
+    if(S?.players){
+      S.players.forEach(p=>trackOvrV91(p,S.season));
+      save();
+    }
+  };
+})();
+
 loadDB();
 })();
 </script>
