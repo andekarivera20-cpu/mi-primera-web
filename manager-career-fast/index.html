@@ -2177,6 +2177,308 @@ loadDB=async function(){
   };
 })();
 
+
+// ===== DRESSING ROOM DYNAMICS 10.2 =====
+// Evolución ligera del sistema V7: armonía, líderes, promesas visibles y conversaciones.
+(function(){
+  const style=document.createElement('style');
+  style.textContent=
+    '.room-kpis-v102{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:12px 0 14px}'+
+    '.room-kpi-v102{padding:11px;border:1px solid var(--line);border-radius:12px;background:#0b1811;text-align:center}'+
+    '.room-kpi-v102 small{display:block;color:var(--muted);font-size:10px;margin-bottom:4px}'+
+    '.room-kpi-v102 strong{font-size:20px}'+
+    '.room-meter-v102{height:8px;background:#17251e;border-radius:99px;overflow:hidden;margin-top:7px}'+
+    '.room-meter-v102>i{display:block;height:100%;background:var(--accent);border-radius:99px}'+
+    '.promise-v102{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid #1b2c23}'+
+    '.promise-v102:last-child{border-bottom:0}'+
+    '.room-status-v102{font-size:10px;font-weight:900;padding:3px 7px;border-radius:999px;border:1px solid var(--line)}'+
+    '.room-status-v102.good{color:#8ee8a8;border-color:#2f6541;background:#102319}'+
+    '.room-status-v102.warn{color:#ffd277;border-color:#725a24;background:#241d0e}'+
+    '.room-status-v102.bad{color:#ff9a9a;border-color:#743737;background:#251111}'+
+    '.issue-actions-v102{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:8px}'+
+    '.issue-actions-v102 .btn{min-height:42px}'+
+    '.room-player-v102{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #1b2c23}'+
+    '.room-player-v102:last-child{border-bottom:0}'+
+    '@media(max-width:650px){.room-kpis-v102{grid-template-columns:1fr}.issue-actions-v102{grid-template-columns:1fr}}';
+  document.head.appendChild(style);
+
+  function roomSquadV102(){return getClubPlayers(S.club)}
+  function roleTargetV102(p){
+    if((p.squadRole||'')==='Clave')return .65;
+    if(p.hierarchy==='Líder')return .55;
+    if(p.hierarchy==='Importante')return .45;
+    if(p.hierarchy==='Promesa')return .18;
+    return .24;
+  }
+  function roomHarmonyV102(){
+    const ps=roomSquadV102();
+    if(!ps.length)return 50;
+    const morale=ps.reduce((a,p)=>a+(p.morale||70),0)/ps.length;
+    const unhappy=ps.filter(p=>p.wantsOut||(p.morale||70)<45).length;
+    const open=(S.playerIssues||[]).filter(x=>x.status==='open').length;
+    const leaders=ps.filter(p=>p.hierarchy==='Líder');
+    const leaderMood=leaders.length?leaders.reduce((a,p)=>a+(p.morale||70),0)/leaders.length:morale;
+    return clamp(Math.round(morale*.72+leaderMood*.28-unhappy*3-open*2),15,100);
+  }
+  window.roomHarmonyV102=roomHarmonyV102;
+
+  function promiseProgressV102(pr,p){
+    if(!pr||!p)return{label:'—',pct:0};
+    if(pr.type==='starter'){
+      if(!Number.isFinite(pr.baseAppearances))pr.baseAppearances=p.appearances||0;
+      if(!Number.isFinite(pr.baseStarts))pr.baseStarts=p.starts||0;
+      const apps=Math.max(0,(p.appearances||0)-pr.baseAppearances);
+      const starts=Math.max(0,(p.starts||0)-pr.baseStarts);
+      const pct=clamp(Math.round((starts/3)*100),0,100);
+      return{label:starts+' de 3 titularidades · '+apps+' PJ',pct};
+    }
+    if(pr.type==='captain')return{label:S.captainId===p.id?'Cumplida':'Pendiente',pct:S.captainId===p.id?100:20};
+    if(pr.type==='salary'){const target=Math.max(1000,(p.value||0)/5000);return{label:euro(p.wage||0)+' / '+euro(target),pct:clamp(Math.round((p.wage||0)/Math.max(1,target)*100),0,100)}}
+    if(pr.type==='europe')return{label:'Objetivo de final de temporada',pct:45};
+    return{label:'En curso',pct:35};
+  }
+
+  const addPromiseV102Base=addPromiseV7;
+  addPromiseV7=function(p,type,days=90){
+    if(!p)return;
+    const existing=(S.playerPromises||[]).find(x=>x.playerId===p.id&&x.type===type&&x.status==='active');
+    if(existing)return existing;
+    const before=(S.playerPromises||[]).length;
+    addPromiseV102Base(p,type,days);
+    const pr=S.playerPromises[before];
+    if(pr){
+      pr.baseAppearances=p.appearances||0;
+      pr.baseStarts=p.starts||0;
+      pr.baseMinutes=p.minutes||0;
+      pr.targetStarts=type==='starter'?3:null;
+    }
+    return pr;
+  };
+
+  evaluatePromisesV7=function(date=S.date,seasonEnd=false){
+    for(const pr of (S.playerPromises||[]).filter(x=>x.status==='active')){
+      const p=S.players.find(x=>x.id===pr.playerId);
+      if(!p){pr.status='broken';continue}
+      if(!Number.isFinite(pr.baseAppearances))pr.baseAppearances=p.appearances||0;
+      if(!Number.isFinite(pr.baseStarts))pr.baseStarts=p.starts||0;
+      let done=false;
+      if(pr.type==='starter'){
+        const apps=(p.appearances||0)-pr.baseAppearances;
+        const starts=(p.starts||0)-pr.baseStarts;
+        done=starts>=3&&apps>=3;
+      }
+      if(pr.type==='captain')done=S.captainId===p.id;
+      if(pr.type==='salary')done=(p.wage||0)>=Math.max(1000,(p.value||0)/5000);
+      if(pr.type==='europe'&&seasonEnd)done=(S.lastLeagueRank||99)<=7;
+      if(done){
+        pr.status='done';
+        p.morale=clamp((p.morale||70)+8,20,100);
+        p.happinessReason='Promesa cumplida: '+playerPromiseLabelV7(pr.type);
+        addNews('Promesa cumplida',p.name+' valora que hayas cumplido “'+playerPromiseLabelV7(pr.type)+'”.','vestuario');
+        continue;
+      }
+      if((pr.deadline&&date>=pr.deadline)||seasonEnd){
+        pr.status='broken';
+        p.morale=clamp((p.morale||70)-15,20,100);
+        p.happinessReason='Promesa incumplida: '+playerPromiseLabelV7(pr.type);
+        if(p.morale<42)p.wantsOut=true;
+        addNews('Promesa incumplida',p.name+' está molesto porque no se cumplió “'+playerPromiseLabelV7(pr.type)+'”.','vestuario');
+        pushDayEventV7(date,{type:'conflict',text:p.name+': promesa incumplida ('+playerPromiseLabelV7(pr.type)+').'});
+      }
+    }
+  };
+
+  resolveIssueV7=function(issueId,choice){
+    const it=(S.playerIssues||[]).find(x=>x.id===issueId);
+    const p=it&&S.players.find(x=>x.id===it.playerId);
+    if(!it||!p)return;
+    if(choice==='talk'){
+      const gain=p.personality==='Profesional'||p.personality==='Leal'?6:3;
+      p.morale=clamp((p.morale||70)+gain,20,100);
+      p.happinessReason='Se siente escuchado por el entrenador';
+      it.status='resolved';
+      addNews('Conversación positiva',p.name+' agradece haber podido hablar contigo.','vestuario');
+    }else if(choice==='promise'){
+      addPromiseV7(p,'starter',75);
+      p.morale=clamp((p.morale||70)+5,20,100);
+      p.happinessReason='Espera más minutos';
+      it.status='resolved';
+      addNews('Promesa de minutos',p.name+' espera ser titular al menos 3 veces en sus próximos partidos.','vestuario');
+    }else if(choice==='firm'){
+      const professional=p.personality==='Profesional';
+      p.morale=clamp((p.morale||70)+(professional?1:-6),20,100);
+      p.happinessReason=professional?'Acepta la decisión del entrenador':'Molesto por la respuesta del entrenador';
+      it.status='resolved';
+      if((p.morale||70)<36)p.wantsOut=true;
+      addNews('Mano firme',professional?p.name+' acepta tu decisión y seguirá trabajando.':p.name+' no ha encajado bien tu respuesta.','vestuario');
+    }else if(choice==='exit'){
+      p.wantsOut=true;
+      p.transferListed=true;
+      p.morale=clamp((p.morale||70)+2,20,100);
+      p.happinessReason='Busca una salida del club';
+      it.status='resolved';
+      addNews('Jugador en la rampa de salida',p.name+' ha recibido permiso para buscar nuevo club.','mercado');
+    }
+    save();
+    render('dressing');
+  };
+
+  evaluateSquadMoodV7=function(date){
+    if(new Date(date+'T12:00:00Z').getUTCDay()!==1)return;
+    const apps=Math.max(1,S.record?.p||0);
+    const ps=roomSquadV102();
+    for(const p of ps){
+      const ratio=(p.starts||0)/apps;
+      const target=roleTargetV102(p);
+      if(apps>=5&&ratio+0.08<target){
+        p.morale=clamp((p.morale||70)-rnd(2,4),20,100);
+        if((p.morale||70)<58&&Math.random()<.5){
+          const reason=(p.avgRating||0)>=7.1?'Cree que su rendimiento merece más minutos':'No está jugando lo que esperaba';
+          createIssueV7(p,reason);
+        }
+      }else if(apps>=4&&ratio>=target){
+        p.morale=clamp((p.morale||70)+1,20,94);
+        if(!p.wantsOut&&(p.happinessReason||'').includes('jugando'))p.happinessReason='Contento con sus minutos';
+      }
+      if((p.avgRating||0)>=7.35&&apps>=6&&ratio<.35&&Math.random()<.28){
+        createIssueV7(p,'Está en buena forma y pide más protagonismo');
+      }
+      if(p.wantsOut&&Math.random()<.18)pushDayEventV7(date,{type:'conflict',text:p.name+' insiste en abandonar el club.'});
+    }
+    const leaders=ps.filter(p=>p.hierarchy==='Líder');
+    if(leaders.length){
+      const mood=leaders.reduce((a,p)=>a+(p.morale||70),0)/leaders.length;
+      const delta=mood>=78?1:mood<48?-1:0;
+      if(delta)ps.filter(p=>p.hierarchy!=='Líder').forEach(p=>p.morale=clamp((p.morale||70)+delta,20,100));
+    }
+    evaluatePromisesV7(date,false);
+  };
+
+  const teamPowerV102Base=teamPower;
+  teamPower=function(ids){
+    let base=teamPowerV102Base(ids);
+    const ps=(ids||[]).map(id=>S.players.find(p=>p.id===id)).filter(Boolean);
+    if(!ps.length)return base;
+    const morale=ps.reduce((a,p)=>a+(p.morale||70),0)/ps.length;
+    const moraleMod=clamp((morale-70)/20,-1.25,1.25);
+    const harmonyMod=clamp((roomHarmonyV102()-65)/45,-.7,.7);
+    const captain=ps.find(p=>p.id===S.captainId);
+    const captainMod=captain&&captain.hierarchy==='Líder'&&captain.morale>=65?.25:0;
+    return base+moraleMod+harmonyMod+captainMod;
+  };
+
+  const postMatchV102Base=postMatchV7;
+  postMatchV7=function(M,myGoals,oppGoals,f){
+    postMatchV102Base(M,myGoals,oppGoals,f);
+    if(f.comp==='Pretemporada')return;
+    const used=new Set([...(M.startingXI||[]),...(M.subLog||[]).map(s=>s.inId)]);
+    for(const id of used){
+      const p=S.players.find(x=>x.id===id);
+      if(!p)continue;
+      p.morale=clamp((p.morale||70)+(myGoals>oppGoals?1:myGoals<oppGoals?-1:0),20,100);
+      if((p.avgRating||0)>=7.3)p.morale=clamp((p.morale||70)+1,20,100);
+    }
+    const cap=S.players.find(x=>x.id===S.captainId);
+    if(cap&&cap.hierarchy==='Líder'&&cap.morale>=75&&myGoals>=oppGoals){
+      roomSquadV102().forEach(p=>{if(p.id!==cap.id)p.morale=clamp((p.morale||70)+.5,20,100)});
+    }
+  };
+
+  function promiseRowsV102(){
+    const prs=(S.playerPromises||[]).filter(x=>x.status==='active');
+    if(!prs.length)return'<div class="empty">No has hecho promesas activas.</div>';
+    return prs.map(pr=>{
+      const p=S.players.find(x=>x.id===pr.playerId);
+      if(!p)return'';
+      const pg=promiseProgressV102(pr,p);
+      const days=pr.deadline?Math.max(0,dateDiff(S.date,pr.deadline)):0;
+      return '<div class="promise-v102"><div><strong>'+esc(p.name)+'</strong><div class="muted">'+esc(playerPromiseLabelV7(pr.type))+' · '+esc(pg.label)+'</div><div class="room-meter-v102"><i style="width:'+pg.pct+'%"></i></div></div><span class="room-status-v102 '+(days<=14?'bad':days<=35?'warn':'good')+'">'+days+' días</span></div>';
+    }).join('');
+  }
+
+  function playerRoomStatusV102(p,apps){
+    const ratio=(p.starts||0)/Math.max(1,apps);
+    if(p.wantsOut)return{txt:'Quiere salir',cls:'bad'};
+    if((p.morale||70)<45)return{txt:'Descontento',cls:'bad'};
+    if(ratio+0.08<roleTargetV102(p)&&apps>=5)return{txt:'Pocos minutos',cls:'warn'};
+    if((p.morale||70)>=80)return{txt:'Muy contento',cls:'good'};
+    return{txt:'Estable',cls:'good'};
+  }
+
+  renderDressing=function(){
+    ensureV7State();
+    const squad=roomSquadV102().sort((a,b)=>b.overall-a.overall);
+    const inj=squad.filter(p=>p.injuredUntil&&p.injuredUntil>S.date);
+    const issues=(S.playerIssues||[]).filter(x=>x.status==='open');
+    const leaders=squad.filter(p=>p.hierarchy==='Líder').slice(0,6);
+    const used=S.trainingUsedDate===S.date;
+    const harmony=roomHarmonyV102();
+    const avgMorale=Math.round(squad.reduce((a,p)=>a+(p.morale||70),0)/Math.max(1,squad.length));
+    const unhappy=squad.filter(p=>p.wantsOut||(p.morale||70)<45).length;
+    const apps=Math.max(1,S.record?.p||0);
+    els.view.innerHTML=
+      '<div class="row"><h2>Vestuario</h2><span class="spacer"></span><span class="badge">Afición '+Math.round(S.fans)+'%</span></div>'+
+      '<div class="room-kpis-v102">'+
+        '<div class="room-kpi-v102"><small>Armonía</small><strong>'+harmony+'%</strong><div class="room-meter-v102"><i style="width:'+harmony+'%"></i></div></div>'+
+        '<div class="room-kpi-v102"><small>Moral media</small><strong>'+avgMorale+'%</strong><div class="room-meter-v102"><i style="width:'+avgMorale+'%"></i></div></div>'+
+        '<div class="room-kpi-v102"><small>Descontentos</small><strong>'+unhappy+'</strong><div class="muted">'+issues.length+' conversación'+(issues.length===1?'':'es')+' pendiente'+(issues.length===1?'':'s')+'</div></div>'+
+      '</div>'+
+      '<div class="grid2">'+
+        '<div class="card"><h3>Jerarquía y liderazgo</h3>'+(
+          leaders.map(p=>'<div class="statline"><span><strong>'+(p.id===S.captainId?'★ ':'')+esc(p.name)+'</strong><br><small class="muted">'+esc(p.personality)+' · Moral '+Math.round(p.morale||70)+'%</small></span><button class="btn ghost makeCap" data-id="'+p.id+'" '+(p.id===S.captainId?'disabled':'')+'>Capitán</button></div>').join('')||
+          '<div class="empty">Sin líderes claros.</div>'
+        )+'<p class="muted" style="margin-bottom:0">Un capitán con jerarquía y buena moral aporta un pequeño extra al equipo. El ánimo de los líderes también contagia al resto del vestuario.</p></div>'+
+        '<div class="card"><h3>Conversaciones pendientes</h3>'+(
+          issues.length?issues.map(i=>{const p=S.players.find(x=>x.id===i.playerId);return '<div class="issue-card urgent" style="margin-bottom:8px"><strong>😠 '+esc(p?.name||'Jugador')+'</strong><div class="muted">'+esc(i.reason)+'</div><div class="issue-actions-v102"><button class="btn ghost issueAct" data-id="'+i.id+'" data-c="talk">💬 Hablar</button><button class="btn issueAct" data-id="'+i.id+'" data-c="promise">🤝 Prometer minutos</button><button class="btn warn issueAct" data-id="'+i.id+'" data-c="firm">🧱 Ser firme</button><button class="btn danger issueAct" data-id="'+i.id+'" data-c="exit">🚪 Facilitar salida</button></div></div>'}).join(''):
+          '<div class="empty">El vestuario está tranquilo.</div>'
+        )+'</div>'+
+      '</div>'+
+      '<div class="grid2" style="margin-top:14px">'+
+        '<div class="card"><h3>Promesas activas</h3>'+promiseRowsV102()+'</div>'+
+        '<div class="card"><h3>Estado de la plantilla</h3>'+squad.slice().sort((a,b)=>(a.morale||70)-(b.morale||70)).slice(0,8).map(p=>{const st=playerRoomStatusV102(p,apps);return '<div class="room-player-v102"><span><strong>'+esc(p.name)+'</strong><br><small class="muted">'+esc(p.squadRole||p.hierarchy)+' · '+Math.round(p.morale||70)+'% moral · '+(p.starts||0)+' titularidades</small></span><span class="room-status-v102 '+st.cls+'">'+st.txt+'</span></div>'}).join('')+'</div>'+
+      '</div>'+
+      '<div class="card" style="margin-top:14px"><h3>Entrenamiento del equipo</h3><div class="training-actions"><button class="btn train" data-kind="intense" '+(used?'disabled':'')+'>🏋️ Intenso</button><button class="btn train" data-kind="tactical" '+(used?'disabled':'')+'>🧠 Táctico</button><button class="btn train" data-kind="recovery" '+(used?'disabled':'')+'>🧊 Recuperación</button><button class="btn train" data-kind="rest" '+(used?'disabled':'')+'>🛏️ Descanso</button></div></div>'+
+      '<div class="card" style="margin-top:14px"><h3>Parte médico</h3>'+(
+        inj.length?inj.map(p=>{const rem=Math.max(1,dateDiff(S.date,p.injuredUntil));return '<div class="statline"><span><strong>'+esc(p.name)+'</strong><br><small class="muted">'+esc(p.injuredType||'Lesión')+' · vuelve '+dateStr(p.injuredUntil)+'</small></span><span><button class="btn '+(p.forcedAvailable?'warn':'ghost')+' forceP" data-id="'+p.id+'" '+(rem>30?'disabled':'')+'>'+(p.forcedAvailable?'No forzar':'Forzar')+'</button><div class="medical-risk">'+(rem>30?'Demasiado arriesgado':'Riesgo de recaída '+Math.round((.18+rem/100)*100)+'%')+'</div></span></div>'}).join(''):
+        '<div class="empty">Sin lesionados.</div>'
+      )+'</div>';
+
+    els.view.querySelectorAll('.train').forEach(b=>b.onclick=()=>doTraining(b.dataset.kind));
+    els.view.querySelectorAll('.makeCap').forEach(b=>b.onclick=()=>{
+      const old=S.players.find(x=>x.id===S.captainId);
+      S.captainId=b.dataset.id;
+      const p=S.players.find(x=>x.id===S.captainId);
+      if(p){p.morale=clamp((p.morale||70)+4,20,100);p.happinessReason='Orgulloso de ser capitán'}
+      if(old&&old.id!==S.captainId&&old.hierarchy==='Líder')old.morale=clamp((old.morale||70)-2,20,100);
+      evaluatePromisesV7(S.date,false);
+      save();render('dressing');
+    });
+    els.view.querySelectorAll('.issueAct').forEach(b=>b.onclick=()=>resolveIssueV7(b.dataset.id,b.dataset.c));
+    els.view.querySelectorAll('.forceP').forEach(b=>b.onclick=()=>{
+      const p=S.players.find(x=>x.id===b.dataset.id);if(!p)return;
+      p.forcedAvailable=!p.forcedAvailable;p.injuryRisk=p.forcedAvailable?.35:0;
+      addNews('Decisión médica',p.name+' '+(p.forcedAvailable?'será forzado pese a sus molestias':'deja de estar forzado y seguirá recuperándose')+'.','medical');
+      save();render('dressing');
+    });
+  };
+
+  const renderHomeV102Base=renderHome;
+  renderHome=function(){
+    renderHomeV102Base();
+    const h=roomHarmonyV102();
+    const open=(S.playerIssues||[]).filter(x=>x.status==='open').length;
+    const active=(S.playerPromises||[]).filter(x=>x.status==='active').length;
+    const host=els.view.querySelector('.club-dna-v101')||els.view.querySelector('.grid3');
+    if(!host)return;
+    const card=document.createElement('div');
+    card.className='card';
+    card.style.marginTop='14px';
+    card.innerHTML='<div class="row"><h3 style="margin:0">Vestuario</h3><span class="spacer"></span><span class="room-status-v102 '+(h>=72?'good':h>=52?'warn':'bad')+'">'+h+'% armonía</span></div><div class="muted" style="margin-top:7px">'+(open?open+' conversación'+(open===1?'':'es')+' pendiente'+(open===1?'':'s')+'. ':'Sin conflictos abiertos. ')+(active?active+' promesa'+(active===1?'':'s')+' activa'+(active===1?'':'s')+'.':'No hay promesas activas.')+'</div><button class="btn ghost" id="goRoomV102" style="margin-top:9px">Abrir vestuario</button>';
+    host.insertAdjacentElement('afterend',card);
+    const b=card.querySelector('#goRoomV102');if(b)b.onclick=()=>render('dressing');
+  };
+})();
+
 loadDB();
 })();
 </script>
