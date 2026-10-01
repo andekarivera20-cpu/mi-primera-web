@@ -1041,11 +1041,10 @@ loadDB=async function(){
 
   const seasonEndV91Base=seasonEnd;
   seasonEnd=function(){
-    if(S?.players)S.players.forEach(p=>trackOvrV91(p,S.season));
-    const oldSeason=S?.season;
+    if(S?.players)S.players.filter(p=>p.club===S.club||(p.ovrHistory&&p.ovrHistory.length)).forEach(p=>trackOvrV91(p,S.season));
     seasonEndV91Base();
     if(S?.players){
-      S.players.forEach(p=>trackOvrV91(p,S.season));
+      S.players.filter(p=>p.club===S.club||(p.ovrHistory&&p.ovrHistory.length)).forEach(p=>trackOvrV91(p,S.season));
       save();
     }
   };
