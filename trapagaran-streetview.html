@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Trapagaran Street View Game</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#06080a;font-family:Inter,Arial,sans-serif}
+#pano{position:fixed;inset:0}
+#hud{position:fixed;z-index:20;left:14px;top:14px;color:white;background:rgba(0,0,0,.62);border:1px solid rgba(255,255,255,.15);backdrop-filter:blur(10px);padding:10px 12px;border-radius:13px;font-size:13px;line-height:1.45}
+#hud b{font-size:15px}
+#status{position:fixed;z-index:20;left:50%;top:14px;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.62);border:1px solid rgba(255,255,255,.15);padding:8px 12px;border-radius:999px;text-align:center;font-size:12px;max-width:72vw}
+#help{position:fixed;z-index:20;left:50%;bottom:13px;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.62);border:1px solid rgba(255,255,255,.15);padding:9px 12px;border-radius:11px;font-size:12px;text-align:center;white-space:nowrap}
+#avatarCanvas{position:fixed;z-index:18;left:50%;bottom:-12px;transform:translateX(-50%);width:230px;height:350px;pointer-events:none;filter:drop-shadow(0 14px 12px rgba(0,0,0,.4))}
+#setup{position:fixed;z-index:50;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(180deg,#17202a,#080b0e);color:white}
+#setupCard{width:min(610px,92vw);background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:20px;padding:22px;box-shadow:0 25px 70px rgba(0,0,0,.4)}
+#setup h1{font-size:24px;margin:0 0 10px}
+#setup p{color:#d6dde3;line-height:1.5;font-size:14px}
+#keyInput{width:100%;box-sizing:border-box;font-size:16px;padding:12px 13px;border-radius:11px;border:1px solid rgba(255,255,255,.18);background:#0d1217;color:white;outline:none}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+button,a.btn{appearance:none;border:0;border-radius:11px;padding:11px 14px;font-weight:700;font-size:14px;text-decoration:none;cursor:pointer;background:#fff;color:#111}
+button.secondary,a.secondary{background:rgba(255,255,255,.10);color:#fff;border:1px solid rgba(255,255,255,.16)}
+.small{font-size:11px;color:#aeb8c0;margin-top:12px}
+#notice{margin-top:10px;color:#ffc8c8;font-size:12px;min-height:16px}
+@media(max-width:650px){
+ #hud{left:8px;top:8px;font-size:11px}
+ #status{top:auto;bottom:58px;font-size:10px}
+ #help{bottom:7px;width:86%;font-size:10px;white-space:normal}
+ #avatarCanvas{width:165px;height:255px}
+}
+</style>
+</head>
+<body>
+<div id="pano"></div>
+<canvas id="avatarCanvas" width="460" height="700"></canvas>
+<div id="hud"><b>Trapagaran · Calles reales</b><br><span id="road">Buscando Street View…</span><br>Pasos: <span id="steps">0</span></div>
+<div id="status">Google Street View · fotos reales 360°</div>
+<div id="help">W / ↑ avanzar · S / ↓ volver · A/D girar · ratón mirar · Shift + W avanzar rápido</div>
+
+<div id="setup">
+ <div id="setupCard">
+   <h1>Trapagaran con Google Street View</h1>
+   <p>Esta versión usa las <b>fotos reales de las calles de Google Street View</b>. Para incrustarlas dentro del juego, Google exige una clave de Maps JavaScript API.</p>
+   <input id="keyInput" type="password" autocomplete="off" placeholder="Pega aquí tu API key de Google Maps">
+   <div class="row">
+     <button id="startBtn" type="button">Entrar al juego</button>
+     <a class="btn secondary" target="_blank" rel="noopener" href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=43.303508%2C-3.033999&heading=20&pitch=0&fov=80">Abrir Street View real ahora</a>
+   </div>
+   <div id="notice"></div>
+   <div class="small">La clave se guarda solo en este navegador para esta página. Restringe la clave al dominio <b>andekarivera20-cpu.github.io</b> y a Maps JavaScript API.</div>
+ </div>
+</div>
+
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js";
+import {GLTFLoader} from "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/loaders/GLTFLoader.js";
+
+const START={lat:43.303508,lng:-3.033999};
+const setup=document.getElementById("setup");
+const keyInput=document.getElementById("keyInput");
+const startBtn=document.getElementById("startBtn");
+const notice=document.getElementById("notice");
+const stepsEl=document.getElementById("steps");
+const roadEl=document.getElementById("road");
+const statusEl=document.getElementById("status");
+let pano=null,streetService=null,steps=0,lastPano=null;
+let keys={},moveCooldown=0;
+
+try{
+ const saved=sessionStorage.getItem("trapagaran_google_key");
+ if(saved)keyInput.value=saved;
+}catch{}
+
+function loadGoogle(key){
+ return new Promise((resolve,reject)=>{
+   if(window.google?.maps){resolve();return}
+   window.__trapagaranMapsReady=()=>resolve();
+   const s=document.createElement("script");
+   s.src="https://maps.googleapis.com/maps/api/js?key="+encodeURIComponent(key)+"&v=weekly&callback=__trapagaranMapsReady";
+   s.async=true;s.defer=true;
+   s.onerror=()=>reject(new Error("No se pudo cargar Google Maps"));
+   document.head.appendChild(s);
+   setTimeout(()=>reject(new Error("Tiempo de espera agotado")),15000);
+ });
+}
+
+async function start(){
+ const key=keyInput.value.trim();
+ if(!key){notice.textContent="Necesitas una API key para incrustar Street View.";return}
+ startBtn.disabled=true;startBtn.textContent="Cargando…";notice.textContent="";
+ try{
+   await loadGoogle(key);
+   try{sessionStorage.setItem("trapagaran_google_key",key)}catch{}
+   initPano();
+   setup.style.display="none";
+ }catch(e){
+   startBtn.disabled=false;startBtn.textContent="Entrar al juego";
+   notice.textContent="Google no ha aceptado la clave o la API no está habilitada. Comprueba Maps JavaScript API y la facturación.";
+ }
+}
+startBtn.addEventListener("click",start);
+keyInput.addEventListener("keydown",e=>{if(e.key==="Enter")start()});
+
+function initPano(){
+ streetService=new google.maps.StreetViewService();
+ pano=new google.maps.StreetViewPanorama(document.getElementById("pano"),{
+   position:START,
+   pov:{heading:20,pitch:-2},
+   zoom:0.5,
+   addressControl:true,
+   linksControl:false,
+   panControl:false,
+   enableCloseButton:false,
+   fullscreenControl:false,
+   motionTracking:false,
+   motionTrackingControl:false,
+   visible:true
+ });
+ pano.addListener("position_changed",()=>{
+   const p=pano.getPosition();
+   if(p)roadEl.textContent=p.lat().toFixed(5)+", "+p.lng().toFixed(5);
+ });
+ pano.addListener("pano_changed",()=>{
+   const id=pano.getPano();
+   if(id && id!==lastPano){
+     lastPano=id;
+     steps++;
+     stepsEl.textContent=String(Math.max(0,steps-1));
+   }
+ });
+ statusEl.textContent="Street View real · muévete por los enlaces de las calles";
+ animateAvatar();
+ requestAnimationFrame(gameLoop);
+}
+
+function angularDiff(a,b){
+ let d=((a-b+540)%360)-180;
+ return Math.abs(d);
+}
+function bestLink(targetHeading){
+ const links=pano?.getLinks?.()||[];
+ if(!links.length)return null;
+ let best=links[0],score=999;
+ for(const l of links){
+   if(typeof l.heading!=="number"||!l.pano)continue;
+   const s=angularDiff(l.heading,targetHeading);
+   if(s<score){score=s;best=l}
+ }
+ return best;
+}
+function moveForward(reverse=false){
+ if(!pano)return;
+ const pov=pano.getPov();
+ const target=(pov.heading+(reverse?180:0)+360)%360;
+ const link=bestLink(target);
+ if(link?.pano){
+   pano.setPano(link.pano);
+   pano.setPov({heading:link.heading,pitch:pov.pitch});
+   walkingBurst=1;
+ }else{
+   statusEl.textContent="No hay otra panorámica en esa dirección";
+   setTimeout(()=>statusEl.textContent="Street View real · muévete por los enlaces de las calles",900);
+ }
+}
+
+addEventListener("keydown",e=>{
+ keys[e.code]=true;
+ if(["KeyW","KeyS","KeyA","KeyD","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code))e.preventDefault();
+ if(!pano)return;
+ if((e.code==="KeyW"||e.code==="ArrowUp")&&!e.repeat)moveForward(false);
+ if((e.code==="KeyS"||e.code==="ArrowDown")&&!e.repeat)moveForward(true);
+});
+addEventListener("keyup",e=>keys[e.code]=false);
+addEventListener("blur",()=>keys={});
+
+let lastT=performance.now(),walkingBurst=0;
+function gameLoop(t){
+ if(!pano)return;
+ requestAnimationFrame(gameLoop);
+ const dt=Math.min((t-lastT)/1000,.05);lastT=t;
+ const pov=pano.getPov();
+ let changed=false;
+ if(keys.KeyA||keys.ArrowLeft){pov.heading-=70*dt;changed=true}
+ if(keys.KeyD||keys.ArrowRight){pov.heading+=70*dt;changed=true}
+ if(changed)pano.setPov({heading:(pov.heading+360)%360,pitch:pov.pitch});
+ moveCooldown-=dt;
+ if((keys.KeyW||keys.ArrowUp)&&(keys.ShiftLeft||keys.ShiftRight)&&moveCooldown<=0){
+   moveForward(false);moveCooldown=.42;
+ }
+ walkingBurst=Math.max(0,walkingBurst-dt*1.8);
+ avatarWalk=walkingBurst>0||keys.KeyW||keys.ArrowUp;
+}
+
+const canvas=document.getElementById("avatarCanvas");
+const renderer=new THREE.WebGLRenderer({canvas,alpha:true,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(460,700,false);
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.setClearColor(0x000000,0);
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(35,460/700,.1,100);
+camera.position.set(0,1.25,4.2);
+camera.lookAt(0,1.0,0);
+scene.add(new THREE.HemisphereLight(0xffffff,0x332820,2.4));
+const d=new THREE.DirectionalLight(0xffffff,3.2);d.position.set(-2,4,3);scene.add(d);
+let mixer=null,actions={},current=null,avatarWalk=false,model=null;
+function setAct(name){
+ if(!actions[name]||current===actions[name])return;
+ const n=actions[name];n.reset().fadeIn(.18).play();
+ if(current)current.fadeOut(.18);current=n;
+}
+const loader=new GLTFLoader();
+loader.load("https://cdn.jsdelivr.net/gh/mrdoob/three.js@r169/examples/models/gltf/Soldier.glb",g=>{
+ model=g.scene;model.scale.setScalar(.9);model.rotation.y=Math.PI;
+ scene.add(model);mixer=new THREE.AnimationMixer(model);
+ g.animations.forEach(c=>actions[c.name]=mixer.clipAction(c));
+ setAct("Idle");
+},undefined,()=>{
+ const mat=new THREE.MeshStandardMaterial({color:0x1d315d});
+ const body=new THREE.Mesh(new THREE.CapsuleGeometry(.3,.9,6,12),mat);body.position.y=1;
+ scene.add(body);
+});
+let avLast=performance.now();
+function animateAvatar(t=performance.now()){
+ requestAnimationFrame(animateAvatar);
+ const dt=Math.min((t-avLast)/1000,.05);avLast=t;
+ if(mixer){setAct(avatarWalk?"Walk":"Idle");mixer.update(dt)}
+ if(model)model.position.y=Math.sin(t*.005)*(avatarWalk?.018:.004);
+ renderer.render(scene,camera);
+}
+</script>
+</body>
+</html>
