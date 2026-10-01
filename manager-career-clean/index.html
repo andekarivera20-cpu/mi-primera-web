@@ -91,7 +91,7 @@ const LOGO_COUNTRY={'España':'spain','Inglaterra':'england','Alemania':'germany
 const LOGO_ALIASES={'Athletic Club':'Athletic Club Bilbao','Athletic Club de Bilbao':'Athletic Club Bilbao','Deportivo Alavés':'Deportivo Alavés','Deportivo Alaves':'Deportivo Alavés','FC Barcelona':'Barcelona','Real Madrid CF':'Real Madrid','Atlético de Madrid':'Atletico Madrid','Atlético Madrid':'Atletico Madrid','Real Sociedad de Fútbol':'Real Sociedad','Real Betis Balompié':'Real Betis','Villarreal CF':'Villarreal','Valencia CF':'Valencia','Sevilla FC':'Sevilla','RC Celta':'Celta Vigo','Celta de Vigo':'Celta Vigo','RCD Espanyol':'Espanyol','RCD Mallorca':'Mallorca','CA Osasuna':'Osasuna','Rayo Vallecano de Madrid':'Rayo Vallecano','Paris Saint-Germain':'PSG','Paris SG':'PSG','FC Bayern München':'Bayern Munich','Bayern München':'Bayern Munich','Internazionale':'Inter Milan','Inter':'Inter Milan','AC Milan':'Milan','Sporting CP':'Sporting Lisbon','SL Benfica':'Benfica','FC Porto':'Porto'};
 function initials(name){return String(name||'?').split(/\s+/).filter(Boolean).slice(0,3).map(x=>x[0]).join('').toUpperCase()}
 let EXACT_CRESTS_V90={};
-const CREST_MAP_V90_URL='../manager-career/data/crest-map.json?v=2';
+const CREST_MAP_V90_URL='../manager-career/data/crest-map.json?v=20261001c';
 fetch(CREST_MAP_V90_URL,{cache:'force-cache'})
   .then(r=>{if(!r.ok)throw new Error('crest map '+r.status);return r.json()})
   .then(j=>{
@@ -787,8 +787,8 @@ recordMatchStatsV7 = function(M,myGoals,oppGoals){
 
 
 // ===== CLEAN BOOT 1.0: one loader, compact FC27 JSON, async saves =====
-const CLEAN_CLUBS_URL='../manager-career/data/clubs-lite.json';
-const CLEAN_PLAYERS_URL='../manager-career/data/players-lite.json';
+const CLEAN_CLUBS_URL='../manager-career/data/clubs-lite.json?v=20261001c';
+const CLEAN_PLAYERS_URL='../manager-career/data/players-lite.json?v=20261001c';
 const CLEAN_DB_NAME='ManagerCareerClean';
 const CLEAN_SAVE_KEY='career';
 const CLEAN_HAS_KEY='managerCareerCleanHasSave';
