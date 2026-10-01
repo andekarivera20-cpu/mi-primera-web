@@ -43,7 +43,7 @@
       <div class="data-note">Carga ligera: los equipos aparecen primero y la base FC27 optimizada se carga solo al empezar o continuar una carrera.</div>
     </div>
     <div class="setup-grid">
-      <div class="field"><label>Entrenador</label><select id="coachSelect"></select><input id="coachCustom" class="hidden" placeholder="Escribe el nombre del entrenador"></div>
+      <div class="field"><label>Entrenador del equipo</label><div id="coachAutoV96" class="auto-coach-v96">Elige un equipo</div><select id="coachSelect" class="hidden" aria-hidden="true"></select><input id="coachCustom" class="hidden" aria-hidden="true"></div>
       <div class="field"><label>País</label><select id="countrySelect" disabled></select></div>
       <div class="field"><label>Liga</label><select id="leagueSelect" disabled></select></div>
       <div class="field"><label>Equipo</label><select id="teamSelect" disabled></select></div>
@@ -875,9 +875,8 @@ async function cleanContinue(){
 els.start.addEventListener('click',async e=>{
   e.preventDefault();e.stopImmediatePropagation();
   const club=els.team.value,lid=els.league.value;if(!club||!lid)return;
-  const coach=els.coach.value==='__custom__'?(els.coachCustom.value.trim()||'Entrenador personalizado'):els.coach.value;
   const old=els.start.textContent;els.start.disabled=true;els.start.textContent='Preparando carrera…';
-  try{await cleanLoadPlayers();const real=matchClub(club,lid);startCareer(real,lid,coach);localStorage.setItem(CLEAN_HAS_KEY,'1')}
+  try{await cleanLoadPlayers();const real=matchClub(club,lid);const coach=window.managerForClubV96?window.managerForClubV96(real):'Entrenador actual';startCareer(real,lid,coach);localStorage.setItem(CLEAN_HAS_KEY,'1')}
   catch(err){console.error(err);els.start.disabled=false;els.start.textContent=old;els.loadText.textContent='No se pudo cargar FC27 optimizada. Recarga la página.'}
 },true);
 els.continueBtn.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();cleanContinue()},true);
@@ -1477,6 +1476,76 @@ loadDB=async function(){
       try{renderMatch(activeMatchV95)}catch(e){}
     }
   });
+})();
+
+
+// ===== AUTOMATIC CLUB MANAGERS 9.6 =====
+(function(){
+  let MANAGER_MAP_V96={};
+  const MANAGER_URL_V96='../manager-career/data/manager-map.json?v=20261001m2';
+
+  const style=document.createElement('style');
+  style.textContent='.auto-coach-v96{min-height:44px;display:flex;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#0a1510;font-weight:850}.auto-coach-v96 .muted{font-weight:500;margin-left:6px}';
+  document.head.appendChild(style);
+
+  function managerForClubV96(club){
+    if(!club)return'Entrenador actual';
+    return MANAGER_MAP_V96[club]||({ 'Athletic Club':'Edin Terzić','Arsenal FC':'Mikel Arteta','FC Barcelona':'Hansi Flick' }[club])||'Entrenador actual';
+  }
+  window.managerForClubV96=managerForClubV96;
+
+  function updateCoachBoxV96(){
+    const box=document.getElementById('coachAutoV96');
+    if(!box)return;
+    const club=els.team?.value||'';
+    box.textContent=club?managerForClubV96(club):'Elige un equipo';
+  }
+
+  async function loadManagersV96(){
+    try{
+      const r=await fetch(MANAGER_URL_V96,{cache:'no-cache'});
+      if(!r.ok)throw Error('manager map '+r.status);
+      const j=await r.json();
+      MANAGER_MAP_V96=j&&j.managers?j.managers:{};
+    }catch(e){
+      console.warn('Manager map fallback',e);
+      MANAGER_MAP_V96={'Athletic Club':'Edin Terzić','Arsenal FC':'Mikel Arteta','FC Barcelona':'Hansi Flick'};
+    }
+    updateCoachBoxV96();
+  }
+
+  const previewBaseV96=updateTeamPreview;
+  updateTeamPreview=function(){
+    previewBaseV96();
+    const club=els.team?.value||'';
+    if(club&&!els.teamPreview.classList.contains('hidden')){
+      const div=els.teamPreview.querySelector('div');
+      if(div){
+        const line=document.createElement('div');
+        line.className='muted';
+        line.style.marginTop='4px';
+        line.textContent='Entrenador: '+managerForClubV96(club);
+        div.appendChild(line);
+      }
+    }
+    updateCoachBoxV96();
+  };
+
+  const managerProfileBaseV96=managerProfileV7;
+  managerProfileV7=function(club){
+    const p=managerProfileBaseV96(club);
+    return {...p,name:managerForClubV96(club)||p.name};
+  };
+
+  els.team.addEventListener('change',updateCoachBoxV96);
+
+  const loadDBBaseV96=loadDB;
+  loadDB=async function(){
+    const managerPromise=loadManagersV96();
+    await loadDBBaseV96();
+    await managerPromise;
+    updateCoachBoxV96();
+  };
 })();
 
 
