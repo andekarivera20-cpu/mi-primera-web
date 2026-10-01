@@ -112,7 +112,7 @@ jobs:
                   })
 
           # Current known override: Athletic announced Edin Terzic for 2026/27 through 2028.
-          overrides={'Athletic Club':'Edin Terzić'}
+          overrides={'Athletic Club':'Edin Terzić','Arsenal FC':'Mikel Arteta','FC Barcelona':'Hansi Flick'}
 
           def sofascore_manager(meta):
               club=meta['club']
@@ -146,8 +146,55 @@ jobs:
                   else:
                       unresolved.append(club)
 
+          # Direct SofaScore search fallback for clubs whose identity bridge lacks a usable team id.
+          def direct_search_manager(meta):
+              club=meta['club']
+              if club in manager_map:return club,manager_map[club],'existing'
+              target=manual_team_alias.get(club,club)
+              try:
+                  url='https://www.sofascore.com/api/v1/search/all?q='+urllib.parse.quote(target)
+                  raw=get(url,20)
+                  j=json.loads(raw)
+                  items=j if isinstance(j,list) else (j.get('results') or j.get('entities') or [])
+                  best=None;best_sc=0
+                  for item in items:
+                      ent=item.get('entity',item) if isinstance(item,dict) else {}
+                      if not isinstance(ent,dict):continue
+                      typ=(item.get('type') if isinstance(item,dict) else '') or ent.get('type') or ''
+                      if typ and str(typ).lower() not in {'team','club'}:continue
+                      tid=ent.get('id')
+                      nm=ent.get('name') or ''
+                      if not tid or not nm:continue
+                      sc=score_name(target,nm)
+                      if sc>best_sc:
+                          best=(tid,nm);best_sc=sc
+                  if not best or best_sc<.62:return club,None,'search_no_team'
+                  tid,nm=best
+                  raw=get('https://www.sofascore.com/api/v1/team/'+str(tid),20)
+                  j=json.loads(raw)
+                  team=j.get('team',j)
+                  if not isinstance(team,dict):return club,None,'search_bad_team'
+                  if score_name(target,team.get('name') or nm)<.60:return club,None,'search_name_mismatch'
+                  mgr=team.get('manager')
+                  if isinstance(mgr,dict):
+                      name=(mgr.get('name') or mgr.get('shortName') or '').strip()
+                  else:
+                      name=(mgr or '').strip() if isinstance(mgr,str) else ''
+                  if name:return club,name,'sofascore_search'
+              except Exception:
+                  pass
+              return club,None,'search_missing'
+
+          unresolved_now=[m for m in club_meta if m['club'] not in manager_map]
+          with ThreadPoolExecutor(max_workers=5) as ex:
+              futs=[ex.submit(direct_search_manager,m) for m in unresolved_now]
+              for fut in as_completed(futs):
+                  club,name,src=fut.result()
+                  if name:
+                      manager_map[club]=name;source_map[club]=src
+
           # Wikidata fallback using the matched club's current head coach (P286).
-          missing_meta=[m for m in club_meta if m['club'] in unresolved and m['match'] and m['match'].get('wikidata')]
+          missing_meta=[m for m in club_meta if m['club'] not in manager_map and m['match'] and m['match'].get('wikidata')]
           qid_by_club={m['club']:m['match']['wikidata'] for m in missing_meta}
           qids=sorted(set(qid_by_club.values()))
           coach_qid_by_team={}
@@ -225,3 +272,5 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m "Build current manager map for Manager Career"
           git push
+
+# second-pass direct club search
