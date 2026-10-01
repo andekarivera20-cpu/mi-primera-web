@@ -1826,6 +1826,207 @@ loadDB=async function(){
   };
 })();
 
+
+// ===== MARKET SCOUTING 10.0 =====
+(function(){
+  const style=document.createElement('style');
+  style.textContent=
+    '.scout-chip-v100{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:999px;border:1px solid #294235;background:#0d1b14;font-size:10px;color:#b9c9bf}'+
+    '.scout-btn-v100{white-space:nowrap}'+
+    '.scout-report-v100{margin-top:9px;padding:8px 9px;border-left:3px solid #416d50;background:#0a1510;border-radius:8px;font-size:11px}';
+  document.head.appendChild(style);
+
+  function ensureScoutStateV100(){
+    if(!S)return;
+    if(!Array.isArray(S.marketScoutingTasks))S.marketScoutingTasks=[];
+  }
+
+  function scoutLevelV100(){
+    return clamp(Number((S&&S.staff&&S.staff.scouting)||1),1,5);
+  }
+
+  function knowledgeV100(p){
+    if(!p||p.club===S.club)return 100;
+    if(!Number.isFinite(p.marketScoutConfidence)){
+      p.marketScoutConfidence=clamp(18+scoutLevelV100()*4+(hashV7(p.id||p.name)%13),20,55);
+    }
+    return clamp(Math.round(p.marketScoutConfidence),0,100);
+  }
+
+  function scoutTaskV100(p){
+    ensureScoutStateV100();
+    return S.marketScoutingTasks.find(function(t){return String(t.playerId)===String(p.id)});
+  }
+
+  function processScoutTasksV100(){
+    ensureScoutStateV100();
+    const keep=[];
+    let changed=false;
+    for(const t of S.marketScoutingTasks){
+      if(t.completeDate>S.date){keep.push(t);continue}
+      const p=S.players.find(function(x){return String(x.id)===String(t.playerId)});
+      if(!p)continue;
+      const before=knowledgeV100(p);
+      p.marketScoutConfidence=clamp(before+32+scoutLevelV100()*8,0,100);
+      changed=true;
+      addNews('Informe de scouting',p.name+': informe actualizado con '+Math.round(p.marketScoutConfidence)+'% de confianza.','scouting');
+    }
+    S.marketScoutingTasks=keep;
+    if(changed)save();
+  }
+
+  function estimateV100(value,conf,isPotential){
+    if(conf>=96)return String(value);
+    const spread=isPotential?(conf<40?9:conf<70?6:conf<86?3:2):(conf<40?6:conf<70?4:conf<86?2:1);
+    const lo=clamp(Math.round(value-spread),40,99);
+    const hi=clamp(Math.round(value+spread),40,99);
+    return lo===hi?String(lo):(lo+'–'+hi);
+  }
+
+  function reportV100(p){
+    const conf=knowledgeV100(p);
+    return {
+      conf:conf,
+      ovr:estimateV100(p.overall,conf,false),
+      pot:estimateV100(p.potential,conf,true),
+      exact:conf>=96
+    };
+  }
+
+  function requestScoutV100(p){
+    processScoutTasksV100();
+    if(!p||p.club===S.club)return;
+    const task=scoutTaskV100(p);
+    if(task){toast('Informe en curso · llega '+dateStr(task.completeDate));return}
+    if(knowledgeV100(p)>=100){toast('Ya tienes un informe completo');return}
+    const days=Math.max(2,7-scoutLevelV100());
+    const complete=isoAdd(S.date,days);
+    S.marketScoutingTasks.push({playerId:p.id,started:S.date,completeDate:complete});
+    pushDayEventV7(complete,{type:'scouting',text:'Informe de mercado listo: '+p.name+'.'});
+    save();
+    toast('Ojeador enviado · informe en '+days+' días');
+  }
+
+  function scoutControlV100(p){
+    const task=scoutTaskV100(p);
+    const conf=knowledgeV100(p);
+    if(task)return '<button class="btn ghost scout-btn-v100" disabled>🔎 '+esc(dateStr(task.completeDate))+'</button>';
+    if(conf>=100)return '<span class="scout-chip-v100">✓ Informe completo</span>';
+    return '<button class="btn ghost scout-btn-v100" data-scout-v100="'+esc(String(p.id))+'">🔎 Ojear</button>';
+  }
+
+  function bindScoutV100(root){
+    root.querySelectorAll('[data-scout-v100]').forEach(function(b){
+      b.onclick=function(){
+        const p=S.players.find(function(x){return String(x.id)===String(b.dataset.scoutV100)});
+        requestScoutV100(p);
+        if($('#searchResults'))decorateSearchV100();
+        decorateTransfersV100();
+      };
+    });
+  }
+
+  function addControlV100(container,p){
+    if(!container||container.querySelector('[data-scout-v100],.scout-chip-v100'))return;
+    const wrap=document.createElement('span');
+    wrap.innerHTML=scoutControlV100(p);
+    while(wrap.firstChild)container.appendChild(wrap.firstChild);
+  }
+
+  function decorateSearchV100(){
+    const root=$('#searchResults');
+    if(!root)return;
+    processScoutTasksV100();
+
+    root.querySelectorAll('tbody tr').forEach(function(tr){
+      const buy=tr.querySelector('.buy[data-id]');
+      if(!buy)return;
+      const p=S.players.find(function(x){return String(x.id)===String(buy.dataset.id)});
+      if(!p)return;
+      const rep=reportV100(p);
+      const cells=tr.querySelectorAll('td');
+      if(cells[3])cells[3].innerHTML='<strong>'+esc(rep.ovr)+'</strong><br><small class="muted">'+rep.conf+'% info</small>';
+      addControlV100(buy.closest('.row')||buy.parentElement,p);
+    });
+
+    root.querySelectorAll('.market-card').forEach(function(card){
+      const buy=card.querySelector('.buy[data-id]');
+      if(!buy)return;
+      const p=S.players.find(function(x){return String(x.id)===String(buy.dataset.id)});
+      if(!p)return;
+      const rep=reportV100(p);
+      const rating=card.querySelector('.rating');
+      if(rating){rating.textContent=rep.ovr;rating.title='Confianza scouting '+rep.conf+'%'}
+      addControlV100(buy.closest('.row')||card,p);
+      let box=card.querySelector('.scout-report-v100');
+      if(!box){
+        box=document.createElement('div');
+        box.className='scout-report-v100';
+        const grid=card.querySelector('.player-card-grid');
+        if(grid)grid.insertAdjacentElement('afterend',box);else card.appendChild(box);
+      }
+      box.innerHTML='OVR estimado <strong>'+esc(rep.ovr)+'</strong> · Potencial <strong>'+esc(rep.pot)+'</strong> · confianza '+rep.conf+'%';
+    });
+
+    bindScoutV100(root);
+  }
+
+  function decorateTransfersV100(){
+    processScoutTasksV100();
+    const root=els.view;
+    root.querySelectorAll('.shortlist-row').forEach(function(row){
+      const buy=row.querySelector('.buy[data-id]');
+      if(!buy)return;
+      const p=S.players.find(function(x){return String(x.id)===String(buy.dataset.id)});
+      if(!p)return;
+      const rep=reportV100(p);
+      const small=row.querySelector('small');
+      if(small)small.innerHTML=esc(p.club)+' · OVR '+esc(rep.ovr)+' · POT '+esc(rep.pot)+' · '+rep.conf+'% info · '+euro(p.value);
+      addControlV100(buy.parentElement||row,p);
+    });
+    bindScoutV100(root);
+    decorateSearchV100();
+  }
+
+  const renderTransfersBaseV100=renderTransfersV7;
+  renderTransfersV7=function(){
+    renderTransfersBaseV100();
+    decorateTransfersV100();
+  };
+
+  const searchMarketBaseV100=searchMarket;
+  searchMarket=function(open){
+    searchMarketBaseV100(open);
+    decorateSearchV100();
+  };
+
+  const specialMarketBaseV100=showSpecialMarketV7;
+  showSpecialMarketV7=function(kind){
+    specialMarketBaseV100(kind);
+    decorateSearchV100();
+  };
+
+  const negotiationBaseV100=openTransferNegotiation;
+  openTransferNegotiation=function(id){
+    processScoutTasksV100();
+    const p=S.players.find(function(x){return String(x.id)===String(id)});
+    negotiationBaseV100(id);
+    if(!p||p.club===S.club)return;
+    const rep=reportV100(p);
+    const first=els.matchBox.querySelector('p.muted');
+    if(!first)return;
+    first.innerHTML=esc(p.club)+' · '+esc(p.positions)+' · OVR <strong>'+esc(rep.ovr)+'</strong> · POT <strong>'+esc(rep.pot)+'</strong> · valor '+euro(p.value)+' · confianza scouting '+rep.conf+'%';
+    const info=document.createElement('div');
+    info.className='scout-report-v100';
+    const task=scoutTaskV100(p);
+    if(task)info.innerHTML='🔎 Informe en curso · llegará '+esc(dateStr(task.completeDate));
+    else if(rep.exact)info.textContent='✓ Informe completo: los datos deportivos mostrados son exactos.';
+    else info.innerHTML='Los datos deportivos son estimaciones. '+scoutControlV100(p);
+    first.insertAdjacentElement('afterend',info);
+    bindScoutV100(info);
+  };
+})();
+
 loadDB();
 })();
 </script>
