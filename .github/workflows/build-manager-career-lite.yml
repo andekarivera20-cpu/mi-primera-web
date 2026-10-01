@@ -85,10 +85,10 @@ jobs:
           SPAIN_CURRENT.update({norm(x):'54' for x in SPAIN_54})
 
           # Falsos positivos conocidos provocados por coincidencias de nombre.
-          WRONG_COUNTRY_CLUBS = {
+          WRONG_COUNTRY_CLUBS = {norm(x) for x in {
               'palmeiras','fc goa','atlante','dc united','northeast united',
               'atlanta united','rotherham united','york city','sporting cristal'
-          }
+          }}
 
           def league_for(club):
               n=norm(club)
