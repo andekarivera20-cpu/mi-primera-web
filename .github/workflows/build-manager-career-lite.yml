@@ -1,0 +1,122 @@
+name: Build Manager Career Lite Data
+
+on:
+  push:
+    paths:
+      - '.github/workflows/build-manager-career-lite.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build compact FC27 data
+        run: |
+          python - <<'PY'
+          import csv, io, json, re, unicodedata, urllib.request
+          from difflib import SequenceMatcher
+          from pathlib import Path
+
+          FC27='https://raw.githubusercontent.com/mzafram2001/ea-fc/main/data/dataset_ea_fc_27.csv'
+          META='https://raw.githubusercontent.com/ismailoksuz/EAFC26-DataHub/main/data/players.csv'
+          ALLOWED={'1','4','10','13','14','16','17','19','20','31','32','41','50','53','54','56','65','66','68','80','189','308','330'}
+
+          def get(url):
+              req=urllib.request.Request(url,headers={'User-Agent':'Mozilla/5.0'})
+              with urllib.request.urlopen(req,timeout=120) as r:
+                  return r.read().decode('utf-8-sig','replace')
+
+          def norm(s):
+              s=unicodedata.normalize('NFKD',s or '').encode('ascii','ignore').decode().lower()
+              s=s.replace('&',' and ')
+              s=re.sub(r'\b(fc|cf|afc|sc|ac|rcd|rc|cd|ud|sv|vfb|vfl|calcio|club de futbol|football club)\b',' ',s)
+              s=re.sub(r'[^a-z0-9]+',' ',s)
+              return re.sub(r'\s+',' ',s).strip()
+
+          meta_text=get(META)
+          mr=csv.DictReader(io.StringIO(meta_text))
+          exact={}
+          supported=[]
+          for row in mr:
+              lid=str(int(float(row.get('league_id') or 0)))
+              club=row.get('club_name') or ''
+              if lid in ALLOWED and club:
+                  n=norm(club)
+                  if n and n not in exact:
+                      exact[n]=lid
+                      supported.append((n,lid,club))
+
+          aliases={
+              'athletic bilbao':'53','athletic club':'53','deportivo alaves':'53',
+              'atletico madrid':'53','fc barcelona':'53','real madrid':'53',
+              'paris saint germain':'16','psg':'16','bayern munchen':'19',
+              'bayern munich':'19','inter milan':'31','ac milan':'31'
+          }
+
+          def league_for(club):
+              n=norm(club)
+              if n in exact: return exact[n]
+              if n in aliases: return aliases[n]
+              best=(0,None)
+              for sn,lid,_ in supported:
+                  if n in sn or sn in n:
+                      score=.9*min(len(n),len(sn))/max(len(n),len(sn))
+                  else:
+                      score=SequenceMatcher(None,n,sn).ratio()
+                  if score>best[0]: best=(score,lid)
+              return best[1] if best[0]>=.74 else ''
+
+          fc_text=get(FC27)
+          rows=csv.DictReader(io.StringIO(fc_text))
+          players=[]
+          clubs={}
+          for r in rows:
+              club=(r.get('club_name') or '').strip()
+              if not club: continue
+              lid=league_for(club)
+              if lid not in ALLOWED: continue
+              try:
+                  ovr=int(float(r.get('overall') or 50))
+                  pot=int(float(r.get('potential') or ovr))
+                  age=int(float(r.get('age') or 20))
+                  val=int(float(r.get('value_eur') or 0))
+                  wage=int(float(r.get('wage_eur') or 0))
+              except Exception:
+                  continue
+              pid=str(r.get('sofifa_id') or '')
+              name=(r.get('short_name') or r.get('alias') or r.get('long_name') or '').strip()
+              pos=(r.get('positions') or '').strip()
+              nation=(r.get('nationality') or '').strip()
+              foot=(r.get('preferred_foot') or '').strip()
+              players.append([pid,name,pos,ovr,pot,val,wage,age,club,lid,nation,foot])
+              c=clubs.setdefault(lid,{})
+              st=c.setdefault(club,[0,0])
+              st[0]+=ovr; st[1]+=1
+
+          club_out={}
+          for lid,cs in clubs.items():
+              club_out[lid]=[]
+              for club,(tot,cnt) in cs.items():
+                  club_out[lid].append([club,round(tot/max(1,cnt),1),cnt])
+              club_out[lid].sort(key=lambda x:x[0].lower())
+
+          out=Path('manager-career/data')
+          out.mkdir(parents=True,exist_ok=True)
+          (out/'clubs-lite.json').write_text(json.dumps({'v':1,'leagues':club_out},ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+          (out/'players-lite.json').write_text(json.dumps({'v':1,'fields':['id','name','positions','overall','potential','value','wage','age','club','leagueId','nation','foot'],'players':players},ensure_ascii=False,separators=(',',':')),encoding='utf-8')
+          print('players',len(players),'clubs',sum(len(v) for v in club_out.values()))
+          PY
+
+      - name: Commit generated lite data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manager-career/data/clubs-lite.json manager-career/data/players-lite.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Build compact FC27 data for Manager Career"
+          git push
