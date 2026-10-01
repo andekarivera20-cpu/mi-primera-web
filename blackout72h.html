@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>BLACKOUT: 72H</title>
+<style>
+html,body{margin:0;height:100%;overflow:hidden;background:#05070a;font-family:Inter,Arial,sans-serif}
+#game{position:fixed;inset:0}
+#hud{position:fixed;left:14px;top:14px;z-index:10;color:#fff;background:rgba(4,7,10,.62);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(10px);padding:11px 13px;border-radius:13px;line-height:1.45;font-size:13px;max-width:320px}
+#hud b{font-size:15px}
+#objective{margin-top:6px;color:#d7e4ef}
+#status{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:10;color:#fff;background:rgba(4,7,10,.65);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(8px);padding:8px 12px;border-radius:999px;font-size:12px;text-align:center;max-width:75vw}
+#help{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:10;color:white;background:rgba(4,7,10,.65);border:1px solid rgba(255,255,255,.12);padding:9px 12px;border-radius:12px;font-size:12px;text-align:center}
+#start{position:fixed;inset:0;z-index:20;display:grid;place-items:center;background:linear-gradient(180deg,#111923,#030405);color:white;padding:20px}
+.card{width:min(520px,92vw);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:18px;padding:22px;text-align:center}
+button{border:0;border-radius:11px;padding:12px 16px;font-weight:800;cursor:pointer;background:#fff;color:#111}
+#flashIcon{font-size:18px}
+@media(max-width:650px){#hud{font-size:11px;left:8px;top:8px;max-width:220px}#status{top:auto;bottom:60px;font-size:10px}#help{bottom:7px;width:86%;font-size:10px}}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud"><b>BLACKOUT: 72H</b><br>Día 1 · <span id="clock">22:14</span><br>Batería móvil: <span id="battery">34</span>% <span id="flashIcon">🔦</span><div id="objective">Objetivo: sal de casa y busca provisiones.</div></div>
+<div id="status">La ciudad sigue con electricidad… por ahora.</div>
+<div id="help">WASD moverte · Shift correr · E interactuar · F linterna · ratón girar cámara</div>
+<div id="start"><div class="card"><h1 style="margin:0 0 8px">BLACKOUT: 72H</h1><p style="color:#cbd4dc;line-height:1.5">Una noche normal. Sales de tu piso. A los pocos segundos toda la ciudad se queda sin luz.</p><button id="play">EMPEZAR</button></div></div>
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/+esm";
+
+const root=document.getElementById("game");
+const statusEl=document.getElementById("status");
+const objectiveEl=document.getElementById("objective");
+const batteryEl=document.getElementById("battery");
+const flashIcon=document.getElementById("flashIcon");
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x101722);
+scene.fog=new THREE.FogExp2(0x0b1017,.014);
+
+const camera=new THREE.PerspectiveCamera(64,innerWidth/innerHeight,.1,500);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=.8;
+root.appendChild(renderer.domElement);
+
+const hemi=new THREE.HemisphereLight(0x93a7be,0x1e251d,.45);
+scene.add(hemi);
+const moon=new THREE.DirectionalLight(0xa9c4ff,1.2);
+moon.position.set(-40,70,-20);moon.castShadow=true;scene.add(moon);
+
+const streetLights=[];
+const litMats=[];
+function mat(color,emissive=0,ei=0){
+ const m=new THREE.MeshStandardMaterial({color,roughness:.82,metalness:.05,emissive,emissiveIntensity:ei});
+ return m;
+}
+const asphalt=mat(0x23272b), pavement=mat(0x696e70), grass=mat(0x2e4a31);
+const buildingMats=[mat(0x8d7f73),mat(0xa39283),mat(0x7c716a),mat(0x998b80)];
+
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(220,220),grass);
+ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+
+function addRoad(x,z,w,d){
+ const p=new THREE.Mesh(new THREE.BoxGeometry(w,.08,d),asphalt);p.position.set(x,.04,z);p.receiveShadow=true;scene.add(p);
+}
+addRoad(0,0,18,220); addRoad(-50,0,14,220); addRoad(50,0,14,220);
+addRoad(0,-55,220,14); addRoad(0,55,220,14);
+
+function addSidewalk(x,z,w,d){
+ const p=new THREE.Mesh(new THREE.BoxGeometry(w,.16,d),pavement);p.position.set(x,.08,z);p.receiveShadow=true;scene.add(p);
+}
+[-11,11].forEach(x=>addSidewalk(x,0,4,220));
+[-59,-41,41,59].forEach(x=>addSidewalk(x,0,4,220));
+[-62,-48,48,62].forEach(z=>addSidewalk(0,z,220,4));
+
+function building(x,z,w,d,h,label,colorIndex=0){
+ const g=new THREE.Group();
+ const b=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),buildingMats[colorIndex%buildingMats.length]);b.position.y=h/2;b.castShadow=true;b.receiveShadow=true;g.add(b);
+ const roof=new THREE.Mesh(new THREE.BoxGeometry(w*.92,.4,d*.92),mat(0x44484b));roof.position.y=h+.2;g.add(roof);
+ const signMat=new THREE.MeshStandardMaterial({color:0xdddddd,emissive:0x888888,emissiveIntensity:.45});
+ const sign=new THREE.Mesh(new THREE.BoxGeometry(Math.min(w*.65,12),1.4,.25),signMat);sign.position.set(0,2.4,d/2+.15);g.add(sign);litMats.push(signMat);
+ const canvas=document.createElement("canvas");canvas.width=512;canvas.height=128;const c=canvas.getContext("2d");c.fillStyle="#ffffff";c.font="bold 54px Arial";c.textAlign="center";c.textBaseline="middle";c.fillText(label,256,64);
+ const tex=new THREE.CanvasTexture(canvas);tex.colorSpace=THREE.SRGBColorSpace;
+ const sm=new THREE.MeshBasicMaterial({map:tex,transparent:true});const sp=new THREE.Mesh(new THREE.PlaneGeometry(Math.min(w*.6,11),1.2),sm);sp.position.set(0,2.4,d/2+.29);g.add(sp);
+ g.position.set(x,0,z);scene.add(g);return g;
+}
+
+building(-29,-31,24,20,14,"SUPERMERCADO",1);
+building(30,-30,24,18,10,"BAR",2);
+building(-29,30,24,20,12,"TALLER",0);
+building(30,30,24,20,13,"CLÍNICA",3);
+building(-82,-25,26,32,22,"BLOQUE A",2);
+building(82,-25,26,32,24,"BLOQUE B",1);
+building(-82,33,26,28,18,"BLOQUE C",0);
+building(82,33,26,28,20,"BLOQUE D",3);
+
+for(let i=-90;i<=90;i+=18){
+ for(const x of [-8,8,-47,-53,47,53]){
+   const pole=new THREE.Mesh(new THREE.CylinderGeometry(.12,.16,5,8),mat(0x4b4f52));pole.position.set(x,2.5,i);scene.add(pole);
+   const bulbMat=new THREE.MeshStandardMaterial({color:0xffd889,emissive:0xffc15a,emissiveIntensity:5});
+   const bulb=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),bulbMat);bulb.position.set(x,5.05,i);scene.add(bulb);litMats.push(bulbMat);
+   const l=new THREE.PointLight(0xffc36a,16,18,2);l.position.set(x,4.9,i);scene.add(l);streetLights.push(l);
+ }
+}
+for(let i=-90;i<=90;i+=18){
+ for(const z of [-52,-58,52,58]){
+   const pole=new THREE.Mesh(new THREE.CylinderGeometry(.12,.16,5,8),mat(0x4b4f52));pole.position.set(i,2.5,z);scene.add(pole);
+   const bulbMat=new THREE.MeshStandardMaterial({color:0xffd889,emissive:0xffc15a,emissiveIntensity:5});
+   const bulb=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),bulbMat);bulb.position.set(i,5.05,z);scene.add(bulb);litMats.push(bulbMat);
+   const l=new THREE.PointLight(0xffc36a,16,18,2);l.position.set(i,4.9,z);scene.add(l);streetLights.push(l);
+ }
+}
+
+for(const [x,z] of [[-20,-20],[-34,10],[21,16],[35,-7],[-65,-58],[66,55]]){
+ const car=new THREE.Mesh(new THREE.BoxGeometry(3.7,1.25,1.8),mat(0x5b0d0d));car.position.set(x,.75,z);car.castShadow=true;scene.add(car);
+}
+
+const player=new THREE.Group();scene.add(player);
+const body=new THREE.Mesh(new THREE.CapsuleGeometry(.35,.9,6,12),mat(0x243e70));body.position.y=1.35;body.castShadow=true;player.add(body);
+const head=new THREE.Mesh(new THREE.SphereGeometry(.24,16,12),mat(0xd2a17d));head.position.y=2.15;head.castShadow=true;player.add(head);
+const legs=[];
+for(const x of [-.17,.17]){const l=new THREE.Mesh(new THREE.CylinderGeometry(.1,.11,.82,8),mat(0x20252a));l.position.set(x,.55,0);player.add(l);legs.push(l)}
+player.position.set(-82,0,-48);
+
+const flashlight=new THREE.SpotLight(0xfff6df,0,42,.42,.35,1.2);
+flashlight.castShadow=true;scene.add(flashlight);scene.add(flashlight.target);
+let flashlightOn=false,battery=34;
+
+let blackout=false,started=false,elapsed=0,mission=0;
+let camYaw=Math.PI,camPitch=.22,camDist=6;
+let drag=false,lx=0,ly=0;
+const keys={};
+
+renderer.domElement.addEventListener("pointerdown",e=>{drag=true;lx=e.clientX;ly=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)});
+renderer.domElement.addEventListener("pointermove",e=>{if(!drag)return;camYaw-=(e.clientX-lx)*.004;camPitch=Math.max(-.08,Math.min(.62,camPitch+(e.clientY-ly)*.003));lx=e.clientX;ly=e.clientY});
+renderer.domElement.addEventListener("pointerup",()=>drag=false);
+addEventListener("keydown",e=>{keys[e.code]=true;if(["KeyW","KeyA","KeyS","KeyD","ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].includes(e.code))e.preventDefault();if(e.code==="KeyF"&&!e.repeat)toggleFlash();if(e.code==="KeyE"&&!e.repeat)interact()});
+addEventListener("keyup",e=>keys[e.code]=false);
+
+function toggleFlash(){
+ if(!blackout){statusEl.textContent="Todavía hay luz en la calle.";return}
+ flashlightOn=!flashlightOn;
+ flashlight.intensity=flashlightOn?75:0;
+ flashIcon.textContent=flashlightOn?"🔦 ON":"🔦";
+}
+function blackoutNow(){
+ blackout=true;
+ streetLights.forEach(l=>l.intensity=0);
+ litMats.forEach(m=>m.emissiveIntensity=.02);
+ renderer.toneMappingExposure=.45;
+ statusEl.textContent="⚡ APAGÓN GENERAL. Toda la ciudad se ha quedado sin luz.";
+ objectiveEl.textContent="Objetivo: activa tu linterna y llega al supermercado.";
+ setTimeout(()=>statusEl.style.opacity=".25",4500);
+}
+function interact(){
+ const sx=-29,sz=-31;
+ const d=Math.hypot(player.position.x-sx,player.position.z-sz);
+ if(mission===0&&d<15){
+   mission=1;
+   objectiveEl.textContent="Objetivo: vuelve a tu bloque con las provisiones.";
+   statusEl.style.opacity="1";statusEl.textContent="Has conseguido agua, comida y pilas.";
+ } else if(mission===1&&Math.hypot(player.position.x+82,player.position.z+48)<15){
+   mission=2;
+   objectiveEl.textContent="✅ Provisiones guardadas. Sobrevive a la noche.";
+   statusEl.style.opacity="1";statusEl.textContent="DÍA 1 COMPLETADO — algo no va bien ahí fuera.";
+ }
+}
+document.getElementById("play").addEventListener("click",()=>{document.getElementById("start").style.display="none";started=true;statusEl.textContent="22:14 · Hay cortes de luz en algunos barrios…";});
+
+const clock=new THREE.Clock();
+function loop(){
+ requestAnimationFrame(loop);
+ const dt=Math.min(clock.getDelta(),.035);
+ if(started){
+   elapsed+=dt;
+   if(!blackout&&elapsed>9)blackoutNow();
+   let f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0);
+   let r=(keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0);
+   const run=keys.ShiftLeft||keys.ShiftRight;
+   if(f||r){
+     const n=Math.hypot(f,r);f/=n;r/=n;
+     const fw=new THREE.Vector3(-Math.sin(camYaw),0,-Math.cos(camYaw));
+     const rt=new THREE.Vector3(-fw.z,0,fw.x);
+     const v=fw.multiplyScalar(f).add(rt.multiplyScalar(r)).normalize();
+     const sp=run?8.2:4.6;
+     player.position.addScaledVector(v,sp*dt);
+     player.position.x=Math.max(-103,Math.min(103,player.position.x));
+     player.position.z=Math.max(-103,Math.min(103,player.position.z));
+     player.rotation.y=Math.atan2(v.x,v.z);
+     const t=performance.now()*.012*(run?1.4:1);
+     legs[0].rotation.x=Math.sin(t)*.55;legs[1].rotation.x=-Math.sin(t)*.55;
+   }else{legs[0].rotation.x*=.85;legs[1].rotation.x*=.85}
+   if(flashlightOn){
+     battery=Math.max(0,battery-dt*.04);batteryEl.textContent=Math.floor(battery);
+     if(battery<=0){flashlightOn=false;flashlight.intensity=0;statusEl.style.opacity="1";statusEl.textContent="La batería del móvil se ha agotado."}
+   }
+ }
+ const target=player.position.clone().add(new THREE.Vector3(0,1.5,0));
+ const horiz=camDist*Math.cos(camPitch);
+ const desired=new THREE.Vector3(target.x+Math.sin(camYaw)*horiz,target.y+Math.sin(camPitch)*camDist+1,target.z+Math.cos(camYaw)*horiz);
+ camera.position.lerp(desired,.12);camera.lookAt(target);
+ const dir=new THREE.Vector3();camera.getWorldDirection(dir);
+ flashlight.position.copy(player.position).add(new THREE.Vector3(0,1.8,0));
+ flashlight.target.position.copy(flashlight.position).add(dir.multiplyScalar(10));
+ renderer.render(scene,camera);
+}
+loop();
+addEventListener("resize",()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+</script>
+</body>
+</html>
