@@ -742,6 +742,46 @@ recordMatchStatsV7 = function(M,myGoals,oppGoals){
 };
 
 
+// ===== V8.2 PATCH: persistent compact database cache =====
+const MC_DB_CACHE_NAME='ManagerCareerCache';
+const MC_DB_CACHE_STORE='kv';
+const MC_DB_CACHE_KEY='fc27-europe-lite-v1';
+function idbOpenV82(){
+  return new Promise((resolve,reject)=>{
+    if(!('indexedDB' in window)){resolve(null);return}
+    const req=indexedDB.open(MC_DB_CACHE_NAME,1);
+    req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(MC_DB_CACHE_STORE))db.createObjectStore(MC_DB_CACHE_STORE)};
+    req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error);
+  })
+}
+async function idbGetV82(key){
+  try{const db=await idbOpenV82();if(!db)return null;return await new Promise((resolve,reject)=>{const tx=db.transaction(MC_DB_CACHE_STORE,'readonly'),r=tx.objectStore(MC_DB_CACHE_STORE).get(key);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error)})}catch(e){console.warn('Cache lectura',e);return null}
+}
+async function idbSetV82(key,value){
+  try{const db=await idbOpenV82();if(!db)return false;return await new Promise((resolve,reject)=>{const tx=db.transaction(MC_DB_CACHE_STORE,'readwrite');tx.objectStore(MC_DB_CACHE_STORE).put(value,key);tx.oncomplete=()=>resolve(true);tx.onerror=()=>reject(tx.error)})}catch(e){console.warn('Cache escritura',e);return false}
+}
+function compactPlayerV82(p){
+  return {id:p.id,name:p.name,full:p.full||'',positions:p.positions,overall:p.overall,potential:p.potential,value:p.value,wage:p.wage,age:p.age,club:p.club,leagueId:p.leagueId,leagueName:p.leagueName||'',leagueLevel:p.leagueLevel||1,nation:p.nation||'',foot:p.foot||''}
+}
+async function saveCompactDBV82(){
+  if(!DB?.players?.length)return;
+  const payload={v:1,ts:Date.now(),players:DB.players.map(compactPlayerV82)};
+  await idbSetV82(MC_DB_CACHE_KEY,payload);
+}
+async function restoreCompactDBV82(){
+  const cached=await idbGetV82(MC_DB_CACHE_KEY);
+  if(!cached?.players?.length)return false;
+  const allowed=new Set(Object.keys(EURO_LEAGUES));
+  DB={players:[],clubs:new Map(),leagues:new Map()};
+  for(const raw of cached.players){
+    const lid=String(raw.leagueId||'');if(!allowed.has(lid)||!raw.club)continue;
+    const p={...raw,leagueId:lid,fitness:100,morale:70,goals:0,assists:0,cards:0,injuredUntil:null,suspension:0,contractUntil:null,squadRole:'Rotación',dataEdition:'FC27'};
+    DB.players.push(p);if(!DB.clubs.has(p.club))DB.clubs.set(p.club,{name:p.club,leagueId:lid});
+  }
+  finishDBV81();
+  return DB.players.length>150&&DB.clubs.size>12;
+}
+
 // ===== V8.1 PATCH: fast boot and non-blocking schedules =====
 function fetchTimeoutV81(url, ms=18000){
   const ctl = new AbortController();
@@ -811,41 +851,59 @@ loadDB = async function(){
         els.loadText.textContent='Partida guardada lista · puedes continuar ya';
         els.continueBtn.classList.remove('hidden');
         populateCountries();
-        els.coverage.textContent='Arranque rápido activado · calendarios en segundo plano';
-        setTimeout(()=>backgroundSchedulesV81(),250);
+        els.coverage.textContent='Arranque rápido activado · sin descargar la base completa. Actualizando calendarios…';
+        setTimeout(()=>backgroundSchedulesV81(),50);
         return;
       }
     }catch(e){console.warn('No se pudo usar arranque rápido',e)}
   }
+  els.loadText.textContent='Buscando base FC 27 optimizada…';
+  els.loadBar.style.width='18%';
   try{
-    els.loadBar.style.width='15%';
-    els.loadText.textContent='Cargando base FC 27 optimizada…';
-    const compactURL='./data/fc27-compact.json?v=20261001-1';
-    const r=await fetchTimeoutV81(compactURL,12000);
-    if(!r.ok)throw Error('Base compacta '+r.status);
-    els.loadBar.style.width='62%';
-    const data=await r.json();
-    if(!data||!Array.isArray(data.players)||data.players.length<1000)throw Error('Base compacta incompleta');
-    DB={players:[],clubs:new Map(),leagues:new Map()};
-    for(const a of data.players){
-      const [id,name,full,positions,overall,potential,value,wage,age,club,lid,nation,foot]=a;
-      const p={id:String(id||''),name:name||full||'',full:full||name||'',positions:positions||'',overall:+overall||50,potential:+potential||(+overall||50),value:+value||0,wage:+wage||0,age:+age||20,club,leagueId:String(lid||''),leagueName:EURO_LEAGUES[String(lid||'')]?.name||'',leagueLevel:EURO_LEAGUES[String(lid||'')]?.tier||1,nation:nation||'',foot:foot||'',fitness:100,morale:70,goals:0,assists:0,cards:0,injuredUntil:null,suspension:0,contractUntil:null,squadRole:'Rotación',dataEdition:'FC27'};
-      DB.players.push(p);
-      if(!DB.clubs.has(club))DB.clubs.set(club,{name:club,leagueId:p.leagueId});
-      if(!DB.leagues.has(p.leagueId))DB.leagues.set(p.leagueId,new Set());
-      DB.leagues.get(p.leagueId).add(club);
+    if(await restoreCompactDBV82()){
+      els.loadBar.style.width='100%';
+      els.loadText.textContent='FC 27 lista desde caché rápida · '+DB.players.length.toLocaleString('es-ES')+' jugadores';
+      populateCountries();
+      els.coverage.textContent=DB.leagues.size+' ligas europeas · carga local rápida';
+      if(rawSave)els.continueBtn.classList.remove('hidden');
+      setTimeout(()=>backgroundSchedulesV81(),50);
+      return;
     }
-    finishDBV81();
-    els.loadBar.style.width='100%';
-    els.loadText.textContent='FC 27 lista: '+DB.players.length.toLocaleString('es-ES')+' jugadores · '+DB.clubs.size+' clubes';
-    populateCountries();
-    els.coverage.textContent=DB.leagues.size+' ligas europeas · carga optimizada (~1 MB)';
+  }catch(e){console.warn('No se pudo restaurar la caché FC27',e)}
+  try{
+    els.loadBar.style.width='8%';els.loadText.textContent='Cargando plantillas FC 27…';
+    const cachedMap=cachedLeagueMapV81();
+    let fc27Text='',leagueMap=cachedMap;
+    if(cachedMap){
+      const fc27R=await fetchTimeoutV81(FC27_DATA_URL,22000); if(!fc27R.ok)throw Error('FC27 '+fc27R.status);
+      fc27Text=await fc27R.text(); els.loadBar.style.width='45%';
+    }else{
+      els.loadText.textContent='Primera carga: preparando clubes y FC 27…';
+      const [metaR,fc27R]=await Promise.all([fetchTimeoutV81(LEGACY_META_URL,22000),fetchTimeoutV81(FC27_DATA_URL,22000)]);
+      if(!metaR.ok||!fc27R.ok)throw Error('No se pudieron cargar las bases');
+      const [metaText,ftext]=await Promise.all([metaR.text(),fc27R.text()]); fc27Text=ftext;
+      const allowed=new Set(Object.keys(EURO_LEAGUES)),legacy={};
+      const mr=parseCSV(metaText),mh=mr.shift(),mi={};mh.forEach((x,i)=>mi[x]=i);
+      for(const a of mr){const lid=String(parseFloat(a[mi.league_id]||0)),club=a[mi.club_name];if(allowed.has(lid)&&club&&!legacy[club])legacy[club]=lid}
+      leagueMap=legacy; els.loadBar.style.width='45%';
+    }
+    els.loadText.textContent='Procesando FC 27…'; await new Promise(r=>setTimeout(r,30));
+    DB={players:[],clubs:new Map(),leagues:new Map()};
+    const rows=parseCSV(fc27Text),h=rows.shift(),ix={};h.forEach((x,i)=>ix[x.replace(/^\ufeff/,'')]=i);
+    for(const a of rows){
+      const club=a[ix.club_name]; if(!club)continue;
+      const lid=mapLeagueFromCacheV81(club,leagueMap); if(!lid)continue;
+      const p={id:String(a[ix.sofifa_id]||''),name:a[ix.short_name]||a[ix.alias]||a[ix.long_name],full:a[ix.long_name]||a[ix.short_name],positions:a[ix.positions]||'',overall:+a[ix.overall]||50,potential:+a[ix.potential]||(+a[ix.overall]||50),value:+a[ix.value_eur]||0,wage:+a[ix.wage_eur]||0,age:+a[ix.age]||20,club,leagueId:lid,leagueName:EURO_LEAGUES[lid]?.name||'',leagueLevel:EURO_LEAGUES[lid]?.tier||1,nation:a[ix.nationality]||'',foot:a[ix.preferred_foot]||'',fitness:100,morale:70,goals:0,assists:0,cards:0,injuredUntil:null,suspension:0,contractUntil:null,squadRole:'Rotación',dataEdition:'FC27'};
+      DB.players.push(p); if(!DB.clubs.has(club))DB.clubs.set(club,{name:club,leagueId:lid});
+    }
+    finishDBV81(); saveLeagueMapV81();
+    setTimeout(()=>saveCompactDBV82(),20);
+    els.loadBar.style.width='100%';els.loadText.textContent='FC 27 lista: '+DB.players.length.toLocaleString('es-ES')+' jugadores · '+DB.clubs.size+' clubes';
+    populateCountries();els.coverage.textContent=DB.leagues.size+' ligas europeas · ya puedes empezar, cargando calendarios aparte';
     if(rawSave)els.continueBtn.classList.remove('hidden');
-    setTimeout(()=>backgroundSchedulesV81(),350);
+    setTimeout(()=>backgroundSchedulesV81(),50);
   }catch(e){
-    console.error(e);
-    els.loadBar.style.background='var(--danger)';
-    els.loadText.innerHTML='No se pudo cargar la base optimizada. <button id="retryLoadV81" class="btn primary" type="button">Reintentar</button>';
+    console.error(e);els.loadBar.style.background='var(--danger)';els.loadText.innerHTML='No se pudo completar la carga. <button id="retryLoadV81" class="btn primary" type="button">Reintentar</button>';
     const r=$('#retryLoadV81'); if(r)r.onclick=()=>location.reload();
   }
 };
